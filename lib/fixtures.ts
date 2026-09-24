@@ -42,6 +42,8 @@ export interface FeedMatch {
   scoreHome: number | null;
   scoreAway: number | null;
   bestOdds: boolean;
+  /** Added time per half, operator matches only, so devices can run the clock. */
+  stoppage?: { first: number; second: number };
   markets: Market[];
 }
 
@@ -64,6 +66,8 @@ interface CustomRow {
   final_home: number | null;
   final_away: number | null;
   finished: boolean;
+  stoppage_first?: number | null;
+  stoppage_second?: number | null;
 }
 
 interface OverrideRow {
@@ -189,7 +193,8 @@ async function loadCustom(): Promise<FeedMatch[]> {
   const out: FeedMatch[] = [];
 
   for (const row of data as CustomRow[]) {
-    const clock = matchClock(row.kickoff, row.sport ?? "football");
+    const stoppage = { first: Number(row.stoppage_first ?? 0), second: Number(row.stoppage_second ?? 0) };
+    const clock = matchClock(row.kickoff, row.sport ?? "football", new Date(), stoppage);
     if (clock.isOver) continue; // Finished matches drop out of the feed.
 
     const timeline = row.goal_timeline ?? [];
@@ -231,6 +236,7 @@ async function loadCustom(): Promise<FeedMatch[]> {
       scoreHome: live ? score.home : null,
       scoreAway: live ? score.away : null,
       bestOdds: row.best_odds,
+      stoppage,
       // Operator matches carry the scoreline markets too, fitted to the same
       // 1X2 price so every market on the card agrees with the others.
       markets: [

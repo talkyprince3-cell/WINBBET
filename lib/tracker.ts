@@ -1,5 +1,6 @@
 import { config, refreshConfig } from "./config";
 import { db } from "./supabase";
+import { hasColumn } from "./schema";
 import { matchClock } from "./clock";
 
 /**
@@ -137,15 +138,23 @@ async function customTracker(rawId: string): Promise<Tracker> {
   const supabase = db();
   if (!supabase) return { events: [], stats: [] };
 
-  const { data } = await supabase
-    .from("custom_matches")
-    .select("kickoff, sport, goal_timeline")
-    .eq("id", rawId)
-    .maybeSingle();
+  const withStoppage = await hasColumn("custom_matches", "stoppage_first");
+  const columns: string = withStoppage ? "kickoff, sport, goal_timeline, stoppage_first, stoppage_second" : "kickoff, sport, goal_timeline";
+  const { data: row } = await supabase.from("custom_matches").select(columns).eq("id", rawId).maybeSingle();
+  const data = row as unknown as {
+    kickoff: string;
+    sport: string | null;
+    goal_timeline: { minute: number; team: "home" | "away" }[] | null;
+    stoppage_first?: number | null;
+    stoppage_second?: number | null;
+  } | null;
 
   if (!data) return { events: [], stats: [] };
 
-  const clock = matchClock(data.kickoff, data.sport ?? "football");
+  const clock = matchClock(data.kickoff, data.sport ?? "football", new Date(), {
+    first: Number(data.stoppage_first ?? 0),
+    second: Number(data.stoppage_second ?? 0),
+  });
   const timeline = (data.goal_timeline ?? []) as { minute: number; team: "home" | "away" }[];
 
   // Only goals that have actually happened by the current minute are shown; a

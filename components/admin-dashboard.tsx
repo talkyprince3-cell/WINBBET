@@ -432,6 +432,8 @@ type MatchRow = {
   finished: boolean
   final_home: number | null
   final_away: number | null
+  stoppage_first?: number | null
+  stoppage_second?: number | null
 }
 
 type MatchForm = {
@@ -446,6 +448,8 @@ type MatchForm = {
   odds_draw: string
   odds_away: string
   goal_timeline: Goal[]
+  stoppage_first: string
+  stoppage_second: string
   is_locked: boolean
   best_odds: boolean
 }
@@ -463,7 +467,7 @@ function blankForm(): MatchForm {
     home_team: '', away_team: '', home_crest: '', away_crest: '', league: 'WinnBet Special',
     startNow: false, kickoff: localInput(soon),
     odds_home: '2.00', odds_draw: '3.20', odds_away: '3.50',
-    goal_timeline: [], is_locked: false, best_odds: false,
+    goal_timeline: [], stoppage_first: '0', stoppage_second: '0', is_locked: false, best_odds: false,
   }
 }
 
@@ -473,7 +477,8 @@ function formFromRow(row: MatchRow): MatchForm {
     home_crest: row.home_crest ?? '', away_crest: row.away_crest ?? '',
     league: row.league, startNow: false, kickoff: localInput(new Date(row.kickoff)),
     odds_home: String(row.odds_home), odds_draw: String(row.odds_draw), odds_away: String(row.odds_away),
-    goal_timeline: row.goal_timeline ?? [], is_locked: row.is_locked, best_odds: row.best_odds,
+    goal_timeline: row.goal_timeline ?? [], stoppage_first: String(row.stoppage_first ?? 0), stoppage_second: String(row.stoppage_second ?? 0),
+    is_locked: row.is_locked, best_odds: row.best_odds,
   }
 }
 
@@ -484,16 +489,21 @@ function payload(form: MatchForm) {
     kickoff: (form.startNow ? new Date() : new Date(form.kickoff)).toISOString(),
     odds_home: form.odds_home, odds_draw: form.odds_draw, odds_away: form.odds_away,
     goal_timeline: form.goal_timeline, is_locked: form.is_locked, best_odds: form.best_odds,
+    stoppage_first: Number(form.stoppage_first) || 0, stoppage_second: Number(form.stoppage_second) || 0,
   }
+}
+
+function stoppageOf(row: MatchRow) {
+  return { first: Number(row.stoppage_first ?? 0), second: Number(row.stoppage_second ?? 0) }
 }
 
 /** Where a match stands right now, from the same clock the board uses. */
 function statusOf(row: MatchRow, now: Date) {
   if (row.finished) return { kind: 'ft' as const, label: 'FT', home: row.final_home ?? 0, away: row.final_away ?? 0 }
-  const clock = matchClock(row.kickoff, row.sport ?? 'football', now)
+  const clock = matchClock(row.kickoff, row.sport ?? 'football', now, stoppageOf(row))
   const score = scoreFromTimeline(row.goal_timeline ?? [], clock)
   if (clock.isOver) return { kind: 'ft' as const, label: 'FT', ...score }
-  if (clock.isLive) return { kind: 'live' as const, label: clock.phase === 'ht' ? 'HT' : `${clock.minute}'`, ...score }
+  if (clock.isLive) return { kind: 'live' as const, label: clock.label, phase: clock.phase, ...score }
   return { kind: 'pre' as const, label: new Date(row.kickoff).toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }), home: 0, away: 0 }
 }
 
@@ -566,7 +576,8 @@ function MatchesPanel() {
                 {row.best_odds && <span className="bg-[#e9f7ef] px-1.5 py-0.5 font-bold text-[#0b7a2e]">Best odds</span>}
               </p>
               <p className="mt-1 text-xs text-[#6b7077]">
-                Odds {Number(row.odds_home).toFixed(2)} / {Number(row.odds_draw).toFixed(2)} / {Number(row.odds_away).toFixed(2)}
+                Stoppage +{row.stoppage_first ?? 0}' / +{row.stoppage_second ?? 0}' · FT at {90 + Number(row.stoppage_first ?? 0) + Number(row.stoppage_second ?? 0)}' of play
+                {' · '}Odds {Number(row.odds_home).toFixed(2)} / {Number(row.odds_draw).toFixed(2)} / {Number(row.odds_away).toFixed(2)}
                 {' · '}Goals: {(row.goal_timeline ?? []).length ? (row.goal_timeline ?? []).map((g) => `${g.minute}' ${g.team === 'home' ? row.home_team : row.away_team}`).join(', ') : 'none (0–0)'}
               </p>
             </div>
@@ -575,6 +586,17 @@ function MatchesPanel() {
                 <>
                   <button onClick={() => patch(row.id, { is_locked: !row.is_locked }, row.is_locked ? 'Betting unlocked.' : 'Betting locked.')} className="border px-3 py-1.5 text-xs">{row.is_locked ? 'Unlock' : 'Lock'}</button>
                   <button onClick={() => patch(row.id, { best_odds: !row.best_odds })} className="border px-3 py-1.5 text-xs">{row.best_odds ? 'Best odds off' : 'Best odds on'}</button>
+                  {status.kind === 'live' && (
+                    <button
+                      onClick={() => {
+                        const half = status.phase === 'first' ? 'stoppage_first' : 'stoppage_second'
+                        patch(row.id, { [half]: Number(row[half] ?? 0) + 1 }, `+1 minute added to the ${half === 'stoppage_first' ? 'first' : 'second'} half.`)
+                      }}
+                      className="border border-[#0b7a2e] px-3 py-1.5 text-xs font-semibold text-[#0b7a2e]"
+                    >
+                      +1' stoppage
+                    </button>
+                  )}
                   <button onClick={() => setEditing(row)} className="border px-3 py-1.5 text-xs">Edit</button>
                   <button onClick={() => setFinishing(row)} className="border px-3 py-1.5 text-xs">Set result</button>
                 </>
@@ -670,7 +692,7 @@ function MatchDialog({ title, initial, allowStartNow = false, onClose, onSubmit 
         </label>
       )}
       {!form.startNow && (
-        <Field label="Kickoff" hint="The match goes live on its own at this time and finishes 100 minutes later (45 + 10 half time + 45).">
+        <Field label="Kickoff" hint="The match goes live on its own at this time: 45 minutes, 10 minutes half time, 45 minutes, plus any stoppage time you add.">
           <input type="datetime-local" value={form.kickoff} onChange={set('kickoff')} className={inputClass} />
         </Field>
       )}
@@ -678,6 +700,10 @@ function MatchDialog({ title, initial, allowStartNow = false, onClose, onSubmit 
         <Field label="Home (1)"><input value={form.odds_home} onChange={set('odds_home')} inputMode="decimal" className={inputClass} /></Field>
         <Field label="Draw (X)"><input value={form.odds_draw} onChange={set('odds_draw')} inputMode="decimal" className={inputClass} /></Field>
         <Field label="Away (2)"><input value={form.odds_away} onChange={set('odds_away')} inputMode="decimal" className={inputClass} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="1st half stoppage (min)"><input value={form.stoppage_first} onChange={set('stoppage_first')} inputMode="numeric" className={inputClass} /></Field>
+        <Field label="2nd half stoppage (min)"><input value={form.stoppage_second} onChange={set('stoppage_second')} inputMode="numeric" className={inputClass} /></Field>
       </div>
       <GoalScript goals={form.goal_timeline} home={form.home_team || 'Home'} away={form.away_team || 'Away'} onChange={(goal_timeline) => setForm({ ...form, goal_timeline })} />
       <div className="mb-4 flex flex-wrap gap-4 text-sm">

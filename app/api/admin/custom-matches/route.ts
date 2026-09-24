@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-guard";
+import { hasColumn } from "@/lib/schema";
+import { cleanStoppage } from "@/lib/clock";
 
 export const dynamic = "force-dynamic";
 
@@ -57,9 +59,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Every price must be above 1.00" }, { status: 400 });
   }
 
+  const withStoppage = await hasColumn("custom_matches", "stoppage_first");
   const { data, error } = await supabase
     .from("custom_matches")
     .insert({
+      ...(withStoppage
+        ? { stoppage_first: cleanStoppage(body.stoppage_first), stoppage_second: cleanStoppage(body.stoppage_second) }
+        : {}),
       home_team: String(body.home_team).trim(),
       away_team: String(body.away_team).trim(),
       home_crest: body.home_crest || null,
@@ -102,6 +108,13 @@ export async function PATCH(req: Request) {
     if (field in body) patch[field] = body[field];
   }
   if ("goal_timeline" in patch) patch.goal_timeline = cleanTimeline(patch.goal_timeline);
+  if ("stoppage_first" in body || "stoppage_second" in body) {
+    if (!(await hasColumn("custom_matches", "stoppage_first"))) {
+      return NextResponse.json({ error: "Stoppage time needs database migration 0016. Run it in Supabase, then try again." }, { status: 409 });
+    }
+    if ("stoppage_first" in body) patch.stoppage_first = cleanStoppage(body.stoppage_first);
+    if ("stoppage_second" in body) patch.stoppage_second = cleanStoppage(body.stoppage_second);
+  }
   for (const field of ["odds_home", "odds_draw", "odds_away"]) {
     if (field in patch) {
       const value = price(patch[field], 0);

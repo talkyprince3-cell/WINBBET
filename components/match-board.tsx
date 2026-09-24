@@ -27,6 +27,7 @@ export type BoardMatch = {
   minuteLabel: string
   scoreHome: number | null
   scoreAway: number | null
+  stoppage?: { first: number; second: number }
   markets: BoardMarket[]
 }
 
@@ -126,7 +127,7 @@ export function useLiveClock(match: BoardMatch) {
     return () => clearInterval(timer)
   }, [ticking])
   if (!ticking) return match.minuteLabel || 'LIVE'
-  return matchClock(match.kickoff, match.sport || 'football').label
+  return matchClock(match.kickoff, match.sport || 'football', new Date(), match.stoppage).label
 }
 
 export function LiveClock({ match, className = '' }: { match: BoardMatch; className?: string }) {

@@ -1,4 +1,5 @@
 import { db } from "./supabase";
+import { hasColumn } from "./schema";
 import { matchClock, scoreFromTimeline } from "./clock";
 import { fetchResults, attachCorners, type MatchResult } from "./results";
 import { judge, CORNER_MARKETS } from "./judge";
@@ -195,12 +196,25 @@ async function resolveResults(matchIds: string[]): Promise<Resolved> {
   const customIds = matchIds.filter((id) => id.startsWith("cm_")).map((id) => id.slice(3));
 
   if (customIds.length) {
-    const { data: matches } = await supabase
-      .from("custom_matches")
-      .select("id, kickoff, sport, goal_timeline, final_home, final_away, finished")
-      .in("id", customIds);
+    // Stoppage columns arrive with migration 0016; ask for them only once they exist.
+    const withStoppage = await hasColumn("custom_matches", "stoppage_first");
+    const columns: string = withStoppage
+      ? "id, kickoff, sport, goal_timeline, final_home, final_away, finished, stoppage_first, stoppage_second"
+      : "id, kickoff, sport, goal_timeline, final_home, final_away, finished";
+    const { data } = await supabase.from("custom_matches").select(columns).in("id", customIds);
+    const matches = (data ?? []) as unknown as {
+      id: string;
+      kickoff: string;
+      sport: string | null;
+      goal_timeline: { minute: number; team: "home" | "away" }[] | null;
+      final_home: number | null;
+      final_away: number | null;
+      finished: boolean;
+      stoppage_first?: number | null;
+      stoppage_second?: number | null;
+    }[];
 
-    for (const m of matches ?? []) {
+    for (const m of matches) {
       // An operator "Set result" is authoritative and ends the argument.
       if (m.finished && m.final_home !== null && m.final_away !== null) {
         out.set(`cm_${m.id}`, {
@@ -217,7 +231,11 @@ async function resolveResults(matchIds: string[]): Promise<Resolved> {
 
       // Otherwise the clock decides when the match is over, and the scripted
       // timeline gives the score it ended on.
-      const clock = matchClock(m.kickoff, m.sport ?? "football");
+      const row = m as typeof m & { stoppage_first?: number | null; stoppage_second?: number | null };
+      const clock = matchClock(m.kickoff, m.sport ?? "football", new Date(), {
+        first: Number(row.stoppage_first ?? 0),
+        second: Number(row.stoppage_second ?? 0),
+      });
       if (!clock.isOver) continue;
 
       const timeline = (m.goal_timeline ?? []) as { minute: number; team: "home" | "away" }[];
