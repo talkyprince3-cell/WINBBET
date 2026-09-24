@@ -20,11 +20,11 @@ export interface MatchClock {
 }
 
 const HALF = 45;
-const BREAK = 15;
+const BREAK = 10;
 
 /** Regulation length per sport, in minutes of a single running period. */
 const REGULATION: Record<string, { half: number; halves: number; breakLen: number }> = {
-  football: { half: 45, halves: 2, breakLen: 15 },
+  football: { half: 45, halves: 2, breakLen: 10 },
   basketball: { half: 24, halves: 2, breakLen: 15 },
   tennis: { half: 60, halves: 2, breakLen: 5 },
   hockey: { half: 30, halves: 2, breakLen: 15 },

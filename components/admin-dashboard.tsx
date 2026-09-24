@@ -670,7 +670,7 @@ function MatchDialog({ title, initial, allowStartNow = false, onClose, onSubmit 
         </label>
       )}
       {!form.startNow && (
-        <Field label="Kickoff" hint="The match goes live on its own at this time and finishes 105 minutes later.">
+        <Field label="Kickoff" hint="The match goes live on its own at this time and finishes 100 minutes later (45 + 10 half time + 45).">
           <input type="datetime-local" value={form.kickoff} onChange={set('kickoff')} className={inputClass} />
         </Field>
       )}
