@@ -6,6 +6,7 @@ import { ChevronLeft, Lock, Trophy } from 'lucide-react'
 import { useShell } from '@/components/site-shell'
 import { BookedCode, PlacedReceipt, type PlacedTicket } from '@/components/tickets'
 import { bonusAmount, combinationCount, combinations } from '@/lib/bonus'
+import { matchClock } from '@/lib/clock'
 import { formatMoney } from '@/lib/countries'
 import { useSession, useSlip, type SlipLeg } from '@/lib/store'
 
@@ -108,6 +109,28 @@ export function legFor(match: BoardMatch, market: BoardMarket, price: BoardPrice
 
 export function resultMarket(match: BoardMatch) {
   return match.markets.find((market) => market.key === '1x2') ?? match.markets[0]
+}
+
+/**
+ * The running clock for a live match. Custom matches keep time from their
+ * kickoff, so the clock can tick every second on the player's device rather
+ * than jumping once per feed poll. Upstream matches only report whole
+ * minutes, so they show the feed's label as it comes.
+ */
+export function useLiveClock(match: BoardMatch) {
+  const ticking = match.isLive && match.id.startsWith('cm_')
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!ticking) return
+    const timer = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(timer)
+  }, [ticking])
+  if (!ticking) return match.minuteLabel || 'LIVE'
+  return matchClock(match.kickoff, match.sport || 'football').label
+}
+
+export function LiveClock({ match, className = '' }: { match: BoardMatch; className?: string }) {
+  return <span className={className}>{useLiveClock(match)}</span>
 }
 
 export function kickoffLabel(match: BoardMatch) {
@@ -414,7 +437,7 @@ export function MatchDetail({ id }: { id: string }) {
                 <p className="text-xl font-extrabold text-[#ff7a1a] sm:text-2xl">{score}</p>
                 <div className="flex min-w-0 flex-col items-center gap-2"><Crest src={match.awayCrest} name={match.awayTeam} size={48} /><p className="break-words text-sm font-bold sm:text-lg">{match.awayTeam}</p></div>
               </div>
-              <p className="mt-2 text-center text-xs text-white/60">{kickoffLabel(match)}</p>
+              {match.isLive ? <LiveClock match={match} className="mt-2 block text-center text-sm font-semibold tabular-nums text-white" /> : <p className="mt-2 text-center text-xs text-white/60">{kickoffLabel(match)}</p>}
             </>
           ) : (
             <p className="py-6 text-center text-sm text-white/70">{error || 'Loading match…'}</p>

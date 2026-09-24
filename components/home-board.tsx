@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ChevronRight, Lock, Printer, Radio, RotateCw, SlidersHorizontal } from 'lucide-react'
 import {
-  BetslipPanel, Crest, QuickRegister, kickoffLabel, legFor, resultMarket, useFixtureFeed,
+  BetslipPanel, Crest, LiveClock, QuickRegister, kickoffLabel, legFor, resultMarket, useFixtureFeed,
   type BoardMarket, type BoardMatch, type BoardPrice,
 } from '@/components/match-board'
 import { useSlip } from '@/lib/store'
@@ -442,7 +442,7 @@ function MatchCard({ match, has, pick }: { match: BoardMatch; has: HasFn; pick: 
       <div className="flex items-center justify-between gap-3 text-xs text-[#5f6f69]">
         <p className="min-w-0 truncate">
           {match.isLive
-            ? <span className="font-semibold text-[#00a63a]">● {match.minuteLabel || 'LIVE'}{half ? ` ${half}` : ''}</span>
+            ? <span className="font-semibold tabular-nums text-[#00a63a]">● <LiveClock match={match} />{half ? ` ${half}` : ''}</span>
             : <span>{kickoffLabel(match)}</span>}
           <span> · {match.league}</span>
         </p>
