@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       away_team: String(body.away_team).trim(),
       home_crest: body.home_crest || null,
       away_crest: body.away_crest || null,
-      league: body.league || "WinnBet Special",
+      league: body.league || "GoalVault Special",
       sport: body.sport || "football",
       kickoff: body.kickoff,
       odds_home: odds.home,

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronDown, Gamepad2, Headphones, House, Menu, ReceiptText, UserRound, X } from 'lucide-react'
 import { AuthForm } from '@/components/auth-form'
+import { BrandLogo } from '@/components/brand'
 import { SiteFooter } from '@/components/info-pages'
 import { WinCelebration, hasCelebrated, markCelebrated } from '@/components/tickets'
 import { formatMoney } from '@/lib/countries'
@@ -146,7 +147,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-40 bg-[#0b6e4f] text-white">
           <div className="mx-auto flex max-w-[1180px] items-center gap-2 px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3">
             <button onClick={() => setMenuOpen((open) => !open)} className="shrink-0 md:hidden" aria-label={menuOpen ? 'Close menu' : 'Open menu'}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-            <Link href="/" className="flex items-center gap-1.5 whitespace-nowrap text-[20px] font-extrabold tracking-tight sm:text-[24px]"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ff7a1a] text-[15px] font-black text-[#0b6e4f]">W</span>Winn<span className="-ml-1.5 text-[#ff7a1a]">Bet</span></Link>
+            <Link href="/" aria-label="GoalVault home" className="shrink-0 text-[18px] sm:text-[23px]"><BrandLogo size={26} tone="light" className="gap-1.5 sm:gap-2" wordmarkClassName="max-[359px]:hidden" /></Link>
             <span className="hidden text-xs font-semibold md:block">{player ? player.country_code : 'Ghana'} <ChevronDown size={13} className="inline" /></span>
             <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
               {player ? (
@@ -157,8 +158,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
                 </>
               ) : (
                 <>
-                  <button onClick={() => setAuth('register')} className="h-8 rounded-full bg-[#ff7a1a] px-3.5 text-xs font-bold text-[#0f1f1a] sm:h-9 sm:px-5 sm:text-sm">Join Now</button>
-                  <button onClick={() => setAuth('login')} className="h-8 rounded-full border border-white/70 px-3.5 text-xs font-semibold sm:h-9 sm:px-5 sm:text-sm">Login</button>
+                  <button onClick={() => setAuth('register')} className="h-8 whitespace-nowrap rounded-full bg-[#ff7a1a] px-3 text-xs font-bold text-[#0f1f1a] sm:h-9 sm:px-5 sm:text-sm">Join Now</button>
+                  <button onClick={() => setAuth('login')} className="h-8 whitespace-nowrap rounded-full border border-white/70 px-3 text-xs font-semibold sm:h-9 sm:px-5 sm:text-sm">Login</button>
                 </>
               )}
             </div>

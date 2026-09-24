@@ -297,7 +297,7 @@ function HeroBanner({ onNotice }: { onNotice: (message: string) => void }) {
       <img key={slide.image} src={slide.image} alt="" className="absolute inset-0 h-full w-full object-cover object-right" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
       <div className="relative">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[#ff7a1a]">WinnBet</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#ff7a1a]">GoalVault</p>
         <div className="text-[28px] font-extrabold leading-tight sm:text-4xl">{slide.title}</div>
         <p className="mb-4 text-[13px] text-white/80">{slide.sub}</p>
         {slide.href

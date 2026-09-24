@@ -76,7 +76,7 @@ function Help({ title }: { title: string }) {
   return (
     <section className="mx-auto max-w-[900px] px-3 py-6 sm:px-4 sm:py-12">
       <div className="bg-white p-5 shadow-sm sm:p-8">
-        <h1 className="text-2xl font-black sm:text-3xl">{title === 'Help' ? 'How WinnBet works' : title}</h1>
+        <h1 className="text-2xl font-black sm:text-3xl">{title === 'Help' ? 'How GoalVault works' : title}</h1>
         <p className="mt-3 text-[#6b7077]">Create an account, fund your wallet, choose a fixture or game, and review your selections before placing a bet.</p>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {['Create your account', 'Choose your market', 'Withdraw winnings'].map((step, i) => (

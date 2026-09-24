@@ -10,7 +10,7 @@ const ENDPOINT = "https://sms.arkesel.com/api/v2/sms/send";
 export async function sendSms(to: string, message: string): Promise<boolean> {
   await refreshConfig();
   const key = config("ARKESEL_API_KEY");
-  const sender = config("ARKESEL_SENDER_ID") || "WinnBet";
+  const sender = config("ARKESEL_SENDER_ID") || "GoalVault";
 
   if (!key) {
     console.warn("[sms] ARKESEL_API_KEY unset — skipping:", to, message);

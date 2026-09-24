@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ChevronLeft, Mail, MessageCircle, ShieldCheck } from 'lucide-react'
+import { BrandLogo } from '@/components/brand'
 
 const UPDATED = '23 September 2026'
 
@@ -68,14 +69,14 @@ export function TermsPage() {
   return (
     <InfoPage
       title="Terms & Conditions"
-      intro="These terms form the agreement between you and WinnBet when you open an account, deposit, place a bet or play a game. Please read them carefully. By registering or using the site you confirm that you accept them."
+      intro="These terms form the agreement between you and GoalVault when you open an account, deposit, place a bet or play a game. Please read them carefully. By registering or using the site you confirm that you accept them."
     >
       <Part n={1} title="Who can play">
         <ul>
           <li>You must be at least 18 years old, or the legal gambling age where you live if that is higher.</li>
           <li>You may hold one account only. Duplicate accounts may be closed and any winnings on them voided.</li>
           <li>You must not play on behalf of someone else, and you must not use the site where online betting is against the law.</li>
-          <li>Staff of WinnBet and their immediate families may not bet on the site.</li>
+          <li>Staff of GoalVault and their immediate families may not bet on the site.</li>
         </ul>
       </Part>
       <Part n={2} title="Your account">
@@ -155,7 +156,7 @@ export function PrivacyPage() {
   return (
     <InfoPage
       title="Privacy Policy"
-      intro="This policy explains what personal information WinnBet collects, why we need it, and the choices you have."
+      intro="This policy explains what personal information GoalVault collects, why we need it, and the choices you have."
     >
       <Part n={1} title="What we collect">
         <ul>
@@ -297,7 +298,7 @@ export function SiteFooter({ className = '' }: { className?: string }) {
           <span className="inline-flex items-center gap-1 rounded-full border border-[#0b9b3a]/40 bg-[#e9f7ef] px-3 py-1 text-sm font-bold text-[#0b7a2e]"><ShieldCheck size={16} /> 18+</span>
           <span className="text-sm text-[#6b7077]">Responsible Gaming</span>
         </div>
-        <p className="mt-5 text-3xl font-extrabold tracking-tight text-[#0b6e4f]">Winn<span className="text-[#ff7a1a]">Bet</span></p>
+        <p className="mt-5 text-3xl"><BrandLogo size={44} tone="dark" /></p>
         <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-[#8b8f94]">Sports Betting</p>
         <nav className="mx-auto mt-6 flex max-w-md flex-wrap justify-center gap-x-6 gap-y-3 text-[15px] text-[#5c6068]">
           <Link href="/terms" className="hover:text-[#0b6e4f]">Terms &amp; Conditions</Link>
@@ -316,7 +317,7 @@ export function SiteFooter({ className = '' }: { className?: string }) {
           <Link href="/responsible-gambling" className="underline">play responsibly</Link>.
         </p>
         {info.license_text && <p className="mx-auto mt-3 max-w-lg text-xs text-[#8b8f94]">{info.license_text}</p>}
-        <p className="mt-5 text-xs text-[#8b8f94]">© {year} WinnBet. All Rights Reserved.</p>
+        <p className="mt-5 text-xs text-[#8b8f94]">© {year} GoalVault. All Rights Reserved.</p>
       </div>
     </footer>
   )

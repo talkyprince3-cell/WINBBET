@@ -63,7 +63,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
             color: "#FFFFFF",
           }}
         >
-          WinnBet
+          GoalVault
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: 48 }}>

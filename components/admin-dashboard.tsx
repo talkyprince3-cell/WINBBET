@@ -464,7 +464,7 @@ function blankForm(): MatchForm {
   const soon = new Date(Date.now() + 60 * 60_000)
   soon.setMinutes(0, 0, 0)
   return {
-    home_team: '', away_team: '', home_crest: '', away_crest: '', league: 'WinnBet Special',
+    home_team: '', away_team: '', home_crest: '', away_crest: '', league: 'GoalVault Special',
     startNow: false, kickoff: localInput(soon),
     odds_home: '2.00', odds_draw: '3.20', odds_away: '3.50',
     goal_timeline: [], stoppage_first: '0', stoppage_second: '0', is_locked: false, best_odds: false,

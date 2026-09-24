@@ -7,8 +7,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: 'WinnBet — Sports Betting & Games',
-  description: 'Bet on football, basketball, tennis and live sports, and play instant games on WinnBet.',
+  title: 'GoalVault — Sports Betting & Games',
+  description: 'Bet on football, basketball, tennis and live sports, and play instant games on GoalVault.',
   generator: 'v0.app',
   icons: {
     icon: [
