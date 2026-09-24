@@ -141,6 +141,54 @@ export function correctScoreMarket(home: number, draw: number, away: number): Ma
   return { key: "cs", label: "Correct Score", group: "specials", dense: true, prices };
 }
 
+/** Share of a match's goals that come before half time; second halves run hotter. */
+const FIRST_HALF_SHARE = 0.45;
+
+/**
+ * Half Time / Full Time: the result at the break and at the whistle, nine
+ * outcomes. Each half is its own Poisson draw from the fitted rates, so the
+ * nine prices agree with the 1X2 and correct score on the same match.
+ *
+ * Keyed `af7` so it settles through the same judge as the upstream HT/FT
+ * market; outcomes are "Home/Draw" style, which that judge reads.
+ */
+export function htFtMarket(home: number, draw: number, away: number): Market {
+  const rates = ratesFromOdds(home, draw, away);
+  const first = { home: rates.home * FIRST_HALF_SHARE, away: rates.away * FIRST_HALF_SHARE };
+  const second = { home: rates.home - first.home, away: rates.away - first.away };
+  const sides = ["Home", "Draw", "Away"] as const;
+  const short = { Home: "1", Draw: "X", Away: "2" } as const;
+  const resultOf = (h: number, a: number) => (h > a ? "Home" : h < a ? "Away" : "Draw");
+
+  const p = new Map<string, number>();
+  const N = 8;
+  for (let i = 0; i <= N; i++) {
+    for (let j = 0; j <= N; j++) {
+      const ph = poisson(i, first.home) * poisson(j, first.away);
+      if (ph < 1e-7) continue;
+      const atBreak = resultOf(i, j);
+      for (let k = 0; k <= N; k++) {
+        for (let l = 0; l <= N; l++) {
+          const pf = ph * poisson(k, second.home) * poisson(l, second.away);
+          const key = `${atBreak}/${resultOf(i + k, j + l)}`;
+          p.set(key, (p.get(key) ?? 0) + pf);
+        }
+      }
+    }
+  }
+
+  const prices: Price[] = [];
+  for (const ht of sides) {
+    for (const ft of sides) {
+      const outcome = `${ht}/${ft}`;
+      const chance = p.get(outcome) ?? 0;
+      if (chance > 0.0015) prices.push({ outcome, label: `${short[ht]}/${short[ft]}`, odds: price(chance) });
+    }
+  }
+
+  return { key: "af7", label: "Half Time / Full Time", group: "half", dense: true, prices };
+}
+
 /** Odd/even and exact-goals markets, from the same fitted model. */
 export function goalCountMarkets(home: number, draw: number, away: number): Market[] {
   const rates = ratesFromOdds(home, draw, away);

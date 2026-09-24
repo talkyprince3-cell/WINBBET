@@ -11,7 +11,7 @@ import {
 import { buildMarkets } from "./markets";
 import { matchClock, scoreFromTimeline } from "./clock";
 import { deriveMarkets, driftOdds, applyBoost, type Market } from "./odds";
-import { correctScoreMarket, goalCountMarkets } from "./scoreline";
+import { correctScoreMarket, goalCountMarkets, htFtMarket } from "./scoreline";
 
 /**
  * The public fixture feed.
@@ -237,6 +237,7 @@ async function loadCustom(): Promise<FeedMatch[]> {
         ...deriveMarkets(boosted.home, boosted.draw, boosted.away),
         ...goalCountMarkets(boosted.home, boosted.draw, boosted.away),
         correctScoreMarket(boosted.home, boosted.draw, boosted.away),
+        htFtMarket(boosted.home, boosted.draw, boosted.away),
       ],
     });
   }
