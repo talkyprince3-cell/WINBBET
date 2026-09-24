@@ -1018,6 +1018,11 @@ function ConfigPanel() {
               return (
                 <Field key={field.key} label={field.label} hint={[field.hint, source].filter(Boolean).join(' · ')}>
                   <div className="flex gap-2">
+                    {field.options ? (
+                      <select value={values[field.key] ?? ''} onChange={(event) => setValues({ ...values, [field.key]: event.target.value })} className={`${inputClass} min-w-0 flex-1 bg-white`}>
+                        {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    ) : (
                     <input
                       value={values[field.key] ?? ''}
                       onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
@@ -1026,6 +1031,7 @@ function ConfigPanel() {
                       placeholder={field.secret && state?.saved ? 'Enter a new value to replace it' : ''}
                       className={`${inputClass} min-w-0 flex-1`}
                     />
+                    )}
                     {state?.saved && !cleared && (
                       <button onClick={() => { setClear([...clear, field.key]); setValues({ ...values, [field.key]: '' }) }} className="shrink-0 border px-3 text-xs">Clear</button>
                     )}

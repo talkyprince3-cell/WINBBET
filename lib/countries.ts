@@ -11,6 +11,7 @@ export type Gateway =
   | "korapay"
   | "moolre"
   | "paystack"
+  | "edibytes"
   | "manual";
 
 export type KycKind = "bvn" | "nin" | "national_id";

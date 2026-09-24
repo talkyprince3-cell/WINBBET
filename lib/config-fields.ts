@@ -5,6 +5,8 @@ export type ConfigField = {
   label: string;
   secret: boolean;
   hint?: string;
+  /** When set, the console offers a choice instead of free text. */
+  options?: { value: string; label: string }[];
 };
 
 export type ConfigGroup = { title: string; fields: ConfigField[] };
@@ -20,6 +22,25 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
     ],
   },
   {
+    title: "Payment routing",
+    fields: [
+      {
+        key: "DEPOSIT_GATEWAY_GH",
+        label: "Ghana deposits go through",
+        secret: false,
+        hint: "Leave on the default unless the other gateway's keys are live and working.",
+        options: [
+          { value: "", label: "Default (Flutterwave mobile money)" },
+          { value: "flutterwave_momo", label: "Flutterwave mobile money" },
+          { value: "edibytes", label: "Edibytes checkout" },
+          { value: "paystack", label: "Paystack checkout" },
+          { value: "korapay", label: "Korapay checkout" },
+          { value: "moolre", label: "Moolre mobile money" },
+        ],
+      },
+    ],
+  },
+  {
     title: "Fixtures and odds",
     fields: [{ key: "API_FOOTBALL_KEY", label: "API-Football key", secret: true }],
   },
@@ -32,6 +53,13 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
       { key: "FLUTTERWAVE_WEBHOOK_HASH", label: "Webhook secret hash", secret: true },
       { key: "FLUTTERWAVE_SECRET_KEY", label: "Secret key (v3)", secret: true },
       { key: "FLUTTERWAVE_ENV", label: "Environment", secret: false, hint: "Type sandbox for testing. Anything else is live." },
+    ],
+  },
+  {
+    title: "Edibytes",
+    fields: [
+      { key: "EDIBYTES_SECRET_KEY", label: "Secret key", secret: true, hint: "sk_test_… for testing, sk_live_… once your account is approved." },
+      { key: "EDIBYTES_DOMAIN", label: "Whitelisted domain", secret: false, hint: "Must match a domain under Domains on your Edibytes dashboard. Leave empty to use this site's own address." },
     ],
   },
   {

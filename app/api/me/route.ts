@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { getCountry } from "@/lib/countries";
+import { refreshConfig } from "@/lib/config";
+import { depositGateway } from "@/lib/gateways";
 import { checkWithdrawalGate, qualifiesForApproval } from "@/lib/withdrawals";
 import { linkedSubAdmin } from "@/lib/partner";
 
@@ -12,6 +14,7 @@ import { linkedSubAdmin } from "@/lib/partner";
  * readable by anyone who learns a player id.
  */
 export async function GET(req: Request) {
+  await refreshConfig();
   const supabase = db();
   if (!supabase) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
 
@@ -53,7 +56,7 @@ export async function GET(req: Request) {
       currency: country.currency,
       currencySymbol: country.currencySymbol,
       minFirstDeposit: country.minFirstDeposit,
-      gateway: country.gateway,
+      gateway: depositGateway(country.code, country.gateway),
       payoutRail: country.payoutRail,
       networks: country.networks,
     },

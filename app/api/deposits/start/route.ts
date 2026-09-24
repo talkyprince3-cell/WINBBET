@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { refreshConfig } from "@/lib/config";
 import { getCountry } from "@/lib/countries";
-import { adapterFor } from "@/lib/gateways";
+import { adapterFor, depositGateway } from "@/lib/gateways";
 import { paymentReference } from "@/lib/codes";
 
 /**
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const adapter = adapterFor(country.gateway);
+  const adapter = adapterFor(depositGateway(country.code, country.gateway));
   const reference = paymentReference();
   const origin = new URL(req.url).origin;
 

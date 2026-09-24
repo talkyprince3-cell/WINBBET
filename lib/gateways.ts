@@ -347,6 +347,100 @@ const paystack: GatewayAdapter = {
   },
 };
 
+// ---------------------------------------------------------------- Edibytes
+
+/**
+ * Edibytes: hosted checkout. We open a payment, send the player to Edibytes to
+ * pay, and ask for the outcome by our own reference when they come back.
+ *
+ * Every payment names a domain that must be whitelisted on the Edibytes
+ * dashboard; by default it is the host this site is served from.
+ *
+ * Their success payload was not observable before the account's domain was
+ * whitelisted, so the response is read defensively: the usual field names for
+ * a checkout link and a status are all tried, and anything unrecognised is
+ * logged in full rather than guessed at.
+ */
+function edibytesBase() {
+  return (env("EDIBYTES_BASE_URL") ?? "https://api.edibytes.online").replace(/\/+$/, "");
+}
+
+function pick(json: Record<string, unknown> | null, ...paths: string[]): unknown {
+  for (const path of paths) {
+    let value: unknown = json;
+    for (const key of path.split(".")) value = value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return undefined;
+}
+
+const edibytes: GatewayAdapter = {
+  id: "edibytes",
+  label: "Edibytes",
+  async start({ reference, amount, currency, email, phone, name, redirectUrl }) {
+    const key = env("EDIBYTES_SECRET_KEY");
+    if (!key) return { ok: false, error: "Edibytes is not available right now" };
+    const domain = env("EDIBYTES_DOMAIN") ?? new URL(redirectUrl).host;
+    try {
+      const res = await fetch(`${edibytesBase()}/api/payments/initialize/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Minor units, as in their own example (500000 for GHS 5,000.00).
+          amount: Math.round(amount * 100),
+          currency,
+          reference,
+          domain,
+          email: email || undefined,
+          phone,
+          name,
+          callback_url: redirectUrl,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      const message = pick(json, "error.message", "message", "detail");
+      if (!res.ok) return { ok: false, error: String(message ?? "Could not start checkout") };
+
+      const url = pick(json, "data.authorization_url", "authorization_url", "data.checkout_url", "checkout_url", "data.payment_url", "payment_url", "data.url", "url");
+      if (typeof url !== "string") {
+        console.error("[edibytes] start: no checkout link in response", JSON.stringify(json));
+        return { ok: false, error: "Could not start checkout" };
+      }
+      const id = pick(json, "data.id", "id", "data.access_code", "access_code");
+      return { ok: true, redirectUrl: url, metadata: id ? { edibytesId: id } : undefined };
+    } catch (err) {
+      console.error("[edibytes] start", err);
+      return { ok: false, error: "Could not start checkout" };
+    }
+  },
+  async status(reference) {
+    const key = env("EDIBYTES_SECRET_KEY");
+    if (!key) return { status: "pending" };
+    try {
+      const res = await fetch(`${edibytesBase()}/api/payments/verify/${encodeURIComponent(reference)}/`, {
+        headers: { Authorization: `Bearer ${key}` },
+        cache: "no-store",
+      });
+      if (res.status === 404) return { status: "pending" };
+      const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      const raw = String(pick(json, "data.status", "status", "data.payment_status", "payment_status") ?? "").toLowerCase();
+      const confirmed = ["success", "successful", "succeeded", "completed", "complete", "paid", "confirmed"].includes(raw);
+      const failed = ["failed", "failure", "cancelled", "canceled", "abandoned", "expired", "declined", "reversed"].includes(raw);
+      if (!confirmed && !failed && raw && !["pending", "processing", "initialized", "initiated", "ongoing"].includes(raw)) {
+        console.warn("[edibytes] unknown status", raw, JSON.stringify(json));
+      }
+      const minor = Number(pick(json, "data.amount", "amount"));
+      return {
+        status: confirmed ? "confirmed" : failed ? "failed" : "pending",
+        paidAmount: Number.isFinite(minor) && minor > 0 ? minor / 100 : undefined,
+        paidCurrency: pick(json, "data.currency", "currency") as string | undefined,
+      };
+    } catch {
+      return { status: "pending" };
+    }
+  },
+};
+
 /**
  * The manual rail: the player sends money to the displayed agent number and
  * uploads a screenshot. Nothing is automatic, so the status stays pending until
@@ -369,6 +463,7 @@ const ADAPTERS: Record<Gateway, GatewayAdapter> = {
   korapay,
   moolre,
   paystack,
+  edibytes,
   manual,
 };
 
@@ -387,6 +482,16 @@ export function settledAmount(outcome: ChargeOutcome, requested: number, currenc
     return requested;
   }
   return paid;
+}
+
+/**
+ * The gateway a country's deposits go through. The operator can switch it in
+ * the admin console (DEPOSIT_GATEWAY_GH and so on); otherwise the country's
+ * built-in default stands.
+ */
+export function depositGateway(countryCode: string, fallback: Gateway): Gateway {
+  const chosen = config(`DEPOSIT_GATEWAY_${countryCode.toUpperCase()}`)?.trim().toLowerCase();
+  return chosen && chosen in ADAPTERS ? (chosen as Gateway) : fallback;
 }
 
 export function adapterFor(gateway: Gateway): GatewayAdapter {

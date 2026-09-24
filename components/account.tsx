@@ -159,8 +159,43 @@ export function AccountPage() {
   const { player } = useShell()
   const signOut = useSession((state) => state.signOut)
   const router = useRouter()
-  const { me } = useMe()
+  const { me, reload } = useMe()
   const [hidden, setHidden] = useState(false)
+  const { notify } = useShell()
+  const setBalance = useSession((state) => state.setBalance)
+
+  // Back from a hosted checkout with ?ref=…: ask the rail how it went, for up
+  // to a minute, and credit the moment it confirms.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref')
+    if (!ref || !player) return
+    window.history.replaceState(null, '', '/account')
+    let alive = true
+    let tries = 0
+    notify('Checking your payment…')
+    const check = async () => {
+      if (!alive) return
+      tries++
+      const json = await fetch(`/api/deposits/status?reference=${encodeURIComponent(ref)}`, { cache: 'no-store' }).then((res) => res.json()).catch(() => null)
+      if (!alive) return
+      if (json?.status === 'confirmed') {
+        if (typeof json.balance === 'number') setBalance(json.balance)
+        notify('Deposit received. Your balance is updated.')
+        reload()
+        return
+      }
+      if (json?.status === 'failed') {
+        notify('That payment did not go through. No money was taken.')
+        return
+      }
+      if (tries < 12) setTimeout(check, 5000)
+      else notify('Your payment is still processing. It will show in your balance once confirmed.')
+    }
+    check()
+    return () => {
+      alive = false
+    }
+  }, [player, notify, reload, setBalance])
 
   if (!player) return <NeedSignIn />
 
