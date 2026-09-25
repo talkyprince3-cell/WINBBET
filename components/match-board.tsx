@@ -184,7 +184,7 @@ export function BetslipPanel({
   const setBalance = useSession((state) => state.setBalance)
   const stake = useSlip((state) => state.stake)
   const setStake = useSlip((state) => state.setStake)
-  const mode = useSlip((state) => state.mode)
+  const chosenMode = useSlip((state) => state.mode)
   const setMode = useSlip((state) => state.setMode)
   const systemSize = useSlip((state) => state.systemSize)
   const setSystemSize = useSlip((state) => state.setSystemSize)
@@ -205,6 +205,10 @@ export function BetslipPanel({
     oddsChanged: { match: string; from: number; to: number }[]
   } | null>(null)
 
+  // A multiple needs two selections and a system three, so the slip plays the
+  // best mode the selections allow; the player's choice returns once it fits.
+  const allowed = (item: 'single' | 'multiple' | 'system') => item === 'single' || (item === 'multiple' ? legs.length >= 2 : legs.length >= 3)
+  const mode = allowed(chosenMode) ? chosenMode : legs.length >= 2 ? 'multiple' : 'single'
   const odds = legs.length ? totalOdds() : 0
   const lines = mode === 'single' ? Math.max(legs.length, 1) : mode === 'system' ? combinationCount(legs.length, systemSize) : 1
   const bonus = mode === 'multiple' && legs.length >= 2 ? bonusAmount(stake, odds, legs.map((leg) => leg.odds)) : 0
@@ -213,6 +217,8 @@ export function BetslipPanel({
     : mode === 'system'
       ? Math.round(combinations(legs, systemSize).reduce((sum, line) => sum + stake * line.reduce((acc, leg) => acc * leg.odds, 1), 0) * 100) / 100
       : Math.round((stake * odds + bonus) * 100) / 100
+
+  useEffect(() => setError(''), [legs.length])
 
   const place = async () => {
     setError('')
@@ -324,7 +330,7 @@ export function BetslipPanel({
         <div className="space-y-3 p-3 text-xs">
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-[#edf3f0] p-1">
             {(['single', 'multiple', 'system'] as const).map((item) => (
-              <button key={item} onClick={() => setMode(item)} className={`rounded-md py-1.5 font-semibold capitalize ${mode === item ? 'bg-white text-[#0b6e4f] shadow-sm' : 'text-[#5f6f69]'}`}>{item}</button>
+              <button key={item} disabled={!allowed(item)} onClick={() => setMode(item)} title={allowed(item) ? undefined : item === 'multiple' ? 'Add at least 2 selections' : 'Add at least 3 selections'} className={`rounded-md py-1.5 font-semibold capitalize disabled:cursor-not-allowed disabled:opacity-40 ${mode === item ? 'bg-white text-[#0b6e4f] shadow-sm' : 'text-[#5f6f69]'}`}>{item}</button>
             ))}
           </div>
           {mode === 'system' && (
