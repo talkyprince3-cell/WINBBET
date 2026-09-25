@@ -56,6 +56,8 @@ export async function GET(req: Request) {
       currency: country.currency,
       currencySymbol: country.currencySymbol,
       minFirstDeposit: country.minFirstDeposit,
+      minDeposit: country.minDeposit,
+      maxDeposit: country.maxDeposit,
       gateway: depositGateway(country.code, country.gateway),
       payoutRail: country.payoutRail,
       networks: country.networks,

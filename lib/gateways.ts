@@ -399,7 +399,11 @@ const edibytes: GatewayAdapter = {
       });
       const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
       const message = pick(json, "error.message", "message", "detail");
-      if (!res.ok) return { ok: false, error: String(message ?? "Could not start checkout") };
+      if (!res.ok) {
+        console.error("[edibytes] start refused", res.status, String(message ?? ""), { domain });
+        const setup = /whitelist|domain|api key|not approved|inactive/i.test(String(message ?? ""));
+        return { ok: false, error: setup ? "Deposits are being set up. Please try again shortly." : "Could not start your payment. Please try again." };
+      }
 
       const url = pick(json, "data.authorization_url", "authorization_url", "data.checkout_url", "checkout_url", "data.payment_url", "payment_url", "data.url", "url");
       if (typeof url !== "string") {
@@ -491,7 +495,32 @@ export function settledAmount(outcome: ChargeOutcome, requested: number, currenc
  */
 export function depositGateway(countryCode: string, fallback: Gateway): Gateway {
   const chosen = config(`DEPOSIT_GATEWAY_${countryCode.toUpperCase()}`)?.trim().toLowerCase();
-  return chosen && chosen in ADAPTERS ? (chosen as Gateway) : fallback;
+  if (chosen && chosen in ADAPTERS) return chosen as Gateway;
+  // Nothing chosen: keep the country's default while it has keys, otherwise
+  // use a gateway that does, rather than refusing every deposit.
+  if (hasKeys(fallback)) return fallback;
+  const ready = (["edibytes", "paystack", "korapay", "flutterwave_momo", "moolre"] as Gateway[]).find(hasKeys);
+  return ready ?? fallback;
+}
+
+/** Whether a gateway has the credentials it needs to take a payment. */
+function hasKeys(gateway: Gateway): boolean {
+  switch (gateway) {
+    case "flutterwave_momo":
+      return v4Configured();
+    case "flutterwave_card":
+      return cardsConfigured();
+    case "edibytes":
+      return Boolean(env("EDIBYTES_SECRET_KEY"));
+    case "paystack":
+      return Boolean(env("PAYSTACK_SECRET_KEY"));
+    case "korapay":
+      return Boolean(env("KORAPAY_SECRET_KEY"));
+    case "moolre":
+      return Boolean(env("MOOLRE_API_KEY") && env("MOOLRE_API_USER") && env("MOOLRE_ACCOUNT_NUMBER"));
+    default:
+      return true;
+  }
 }
 
 export function adapterFor(gateway: Gateway): GatewayAdapter {

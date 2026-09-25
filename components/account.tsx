@@ -26,6 +26,8 @@ type Me = {
     code: string
     currencySymbol: string
     minFirstDeposit: number
+    minDeposit?: number
+    maxDeposit?: number
     gateway: string
     payoutRail: 'mobile' | 'bank'
     networks: string[]
@@ -69,6 +71,7 @@ function networkFor(phone: string, countryCode: string, networks: string[]) {
 
 const CHIPS: Record<string, number[]> = {
   NGN: [500, 1000, 2000, 5000, 10000],
+  GHS: [50, 100, 200, 500, 1000],
 }
 const DEFAULT_CHIPS = [2, 5, 10, 50, 100]
 
@@ -307,12 +310,13 @@ export function DepositPage() {
   const country = me?.country
   const currency = player.currency
   const firstDeposit = me ? Number(me.user.total_deposited) <= 0 : false
-  const min = firstDeposit && country ? country.minFirstDeposit : 1
+  const min = country ? (firstDeposit ? Math.max(country.minFirstDeposit, country.minDeposit ?? 1) : country.minDeposit ?? 1) : 200
+  const max = country?.maxDeposit
   const phone = switching && otherPhone.replace(/\D/g, '').length >= 9 ? otherPhone : player.phone
   const network = networkFor(phone, country?.code ?? player.country_code, country?.networks ?? [])
   const cardRail = country?.gateway === 'flutterwave_card'
   const value = Number(amount)
-  const ready = Number.isFinite(value) && value >= min && !busy
+  const ready = Number.isFinite(value) && value >= min && (!max || value <= max) && !busy
   const chips = CHIPS[currency] ?? DEFAULT_CHIPS
 
   const topUp = async () => {
@@ -343,7 +347,8 @@ export function DepositPage() {
   }
 
   const notes = [
-    `Minimum ${firstDeposit ? 'first deposit' : 'per transaction'} is ${formatMoney(min, currency)}.`,
+    `Minimum deposit is ${formatMoney(min, currency)}.`,
+    ...(max ? [`Maximum per transaction is ${formatMoney(max, currency)}.`] : []),
     'Deposit is free, no transaction fees.',
     ...(cardRail ? ['You will enter your card on the next screen.'] : ['A payment prompt is sent to the number above. Approve it to finish.']),
   ]

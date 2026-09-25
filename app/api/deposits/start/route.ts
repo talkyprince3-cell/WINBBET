@@ -40,9 +40,16 @@ export async function POST(req: Request) {
 
   const country = getCountry(user.country_code);
 
-  if (!user.first_deposit_at && amount < country.minFirstDeposit) {
+  const minimum = user.first_deposit_at ? country.minDeposit : Math.max(country.minFirstDeposit, country.minDeposit);
+  if (amount < minimum) {
     return NextResponse.json(
-      { error: `Minimum first deposit is ${country.currencySymbol}${country.minFirstDeposit}` },
+      { error: `Minimum deposit is ${country.currencySymbol}${minimum}` },
+      { status: 400 },
+    );
+  }
+  if (country.maxDeposit && amount > country.maxDeposit) {
+    return NextResponse.json(
+      { error: `Maximum deposit is ${country.currencySymbol}${country.maxDeposit.toLocaleString()}` },
       { status: 400 },
     );
   }
