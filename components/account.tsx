@@ -552,7 +552,8 @@ export function WithdrawPage() {
           <p className="text-[#0f1f1a]">Withdrawable Balance ({currency}) {balance.toFixed(2)}</p>
         </div>
         <AmountField value={amount} onChange={setAmount} currency={currency} min={1} />
-        {me && !me.withdrawal.unlocked && me.withdrawal.progress?.label && (
+        {/* Verification progress appears only once the player has started depositing. */}
+        {me && Number(me.user.total_deposited) > 0 && !me.withdrawal.unlocked && me.withdrawal.progress?.label && (
           <p className="bg-[#edf3f0] px-3 py-2 text-[13px] text-[#5f6f69]">{me.withdrawal.progress.label}</p>
         )}
         {error && <p className="bg-[#fff0f1] px-3 py-2 text-sm text-[#e40014]">{error}</p>}
