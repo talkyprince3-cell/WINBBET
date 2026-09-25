@@ -68,7 +68,10 @@ export async function POST(req: Request) {
       .select("id")
       .eq("referral_code", referralCode.trim().toUpperCase())
       .maybeSingle();
-    if (partner) referredBy = partner.id;
+    if (!partner) {
+      return NextResponse.json({ error: "That referral code doesn't exist. Check it, or leave it empty." }, { status: 400 });
+    }
+    referredBy = partner.id;
   }
 
   const passwordHash = await bcrypt.hash(password, 10);

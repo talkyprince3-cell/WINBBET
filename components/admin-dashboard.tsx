@@ -6,6 +6,7 @@ import { BarChart3, ExternalLink, FileCheck2, KeyRound, Settings, UserCog, Users
 import { matchClock, scoreFromTimeline } from '@/lib/clock'
 import { CONFIG_GROUPS } from '@/lib/config-fields'
 import { formatMoney } from '@/lib/countries'
+import { inviteLink } from '@/lib/invite'
 
 type Role = 'admin' | 'subadmin'
 
@@ -1122,6 +1123,7 @@ function PartnerConsole({ onSignedOut }: { onSignedOut: () => void }) {
         <button onClick={async () => { await fetch('/api/partner/logout', { method: 'POST' }); onSignedOut() }} className="w-full px-3 py-2 text-left text-xs text-white/50">Sign out</button>
       </aside>
       <div className="min-w-0 space-y-4">
+        {partner.referral_code && <InviteCard code={partner.referral_code} approved={Boolean(partner.approved)} />}
         <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm">
           {PERIODS.map((item) => (
             <button key={item.key} onClick={() => setPeriod(item.key)} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${period === item.key ? 'bg-[#171a20] text-white' : 'text-[#6b7077]'}`}>{item.label}</button>
@@ -1157,6 +1159,32 @@ function PartnerConsole({ onSignedOut }: { onSignedOut: () => void }) {
         </div>
       </div>
       {opening && <OpenAccountDialog onClose={() => setOpening(false)} onDone={(text, ok) => { setMessage({ text, tone: ok ? 'ok' : 'error' }); load() }} />}
+    </div>
+  )
+}
+
+function InviteCard({ code, approved }: { code: string; approved: boolean }) {
+  const [copied, setCopied] = useState(false)
+  const link = inviteLink(code)
+  const copy = () => navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600) }, () => {})
+  const share = () => {
+    const text = `Join me on GoalVault and start betting: ${link}`
+    if (navigator.share) navigator.share({ title: 'GoalVault', text, url: link }).catch(() => {})
+    else copy()
+  }
+  return (
+    <div className="bg-white p-4 shadow-sm">
+      <p className="text-xs font-semibold text-[#6b7077]">Your invite link</p>
+      <p className="mt-1 break-all rounded bg-[#f6f7f8] px-3 py-2 font-mono text-sm">{link}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button onClick={copy} className="bg-[#171a20] px-4 py-2 text-xs font-semibold text-white">{copied ? 'Copied' : 'Copy link'}</button>
+        <button onClick={share} className="border px-4 py-2 text-xs font-semibold">Share</button>
+        <a href={`https://wa.me/?text=${encodeURIComponent(`Join me on GoalVault and start betting: ${link}`)}`} target="_blank" rel="noopener noreferrer" className="border px-4 py-2 text-xs font-semibold">WhatsApp</a>
+      </div>
+      <p className="mt-2 text-[11px] text-[#6b7077]">
+        Players who open this link, or type your code <b>{code}</b> when they register, are yours.
+        {!approved && ' You start earning commission once the admin approves your account.'}
+      </p>
     </div>
   )
 }

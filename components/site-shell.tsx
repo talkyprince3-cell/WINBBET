@@ -10,6 +10,7 @@ import { BrandLogo } from '@/components/brand'
 import { SiteFooter } from '@/components/info-pages'
 import { WinCelebration, hasCelebrated, markCelebrated } from '@/components/tickets'
 import { formatMoney } from '@/lib/countries'
+import { rememberInvite } from '@/lib/invite'
 import { useSession, useSlip, type Player } from '@/lib/store'
 
 type AuthMode = 'login' | 'register'
@@ -70,6 +71,17 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const slipCount = mounted ? slipLegs.length : 0
 
   useEffect(() => setMounted(true), [])
+
+  // A sub-admin's invite link: keep the code and invite the visitor to sign up.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('invite')
+    if (!code) return
+    rememberInvite(code)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('invite')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    if (!useSession.getState().player) setAuth('register')
+  }, [])
 
   // The session lives in localStorage, so it is only read after hydration.
   const player = mounted ? storedPlayer : null

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Player } from '@/lib/store'
+import { forgetInvite, savedInvite } from '@/lib/invite'
 import { BrandLogo } from '@/components/brand'
 
 const countries = [
@@ -16,6 +17,7 @@ export function AuthForm({ mode, onClose, switchMode, onSignedIn }: { mode: 'log
   const [identifier, setIdentifier] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [referral, setReferral] = useState('')
   const [password, setPassword] = useState('')
   const [countryCode, setCountryCode] = useState('GH')
   const country = countries.find((item) => item.code === countryCode) ?? countries[0]
@@ -25,6 +27,7 @@ export function AuthForm({ mode, onClose, switchMode, onSignedIn }: { mode: 'log
   useEffect(() => {
     const saved = sessionStorage.getItem('sporty-phone')
     if (saved) setIdentifier(saved)
+    setReferral(savedInvite())
   }, [])
 
   const submit = async () => {
@@ -38,13 +41,14 @@ export function AuthForm({ mode, onClose, switchMode, onSignedIn }: { mode: 'log
       const res = await fetch(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'login' ? { identifier, password } : { name, phone: identifier, email, password, countryCode }),
+        body: JSON.stringify(mode === 'login' ? { identifier, password } : { name, phone: identifier, email, password, countryCode, referralCode: referral }),
       })
       const json = await res.json()
       if (!res.ok) {
         setError(json.error ?? 'Could not continue')
         return
       }
+      if (mode === 'register') forgetInvite()
       onSignedIn({ ...json.user, balance: Number(json.user.balance) })
     } catch {
       setError('Could not reach the server')
@@ -89,6 +93,12 @@ export function AuthForm({ mode, onClose, switchMode, onSignedIn }: { mode: 'log
       )}
       <label className="mb-1 block text-xs font-semibold">Password</label>
       <input value={password} onChange={(event) => setPassword(event.target.value)} className="mb-4 h-11 w-full rounded-xl border border-[#dde7e2] px-3 text-sm outline-none focus:border-[#0b6e4f]" placeholder="Password" type="password" />
+      {mode === 'register' && (
+        <>
+          <label className="mb-1 block text-xs font-semibold">Referral code <span className="font-normal text-[#86958f]">(optional)</span></label>
+          <input value={referral} onChange={(event) => setReferral(event.target.value.toUpperCase())} autoCapitalize="characters" className="mb-4 h-11 w-full rounded-xl border border-[#dde7e2] px-3 text-sm uppercase tracking-wider outline-none focus:border-[#0b6e4f]" placeholder="e.g. AB12CD" />
+        </>
+      )}
       {error && <p className="mb-3 text-xs text-[#0b6e4f]">{error}</p>}
       <button disabled={busy} onClick={submit} className="w-full rounded-xl bg-[#ff7a1a] py-3 font-bold text-[#0f1f1a] disabled:opacity-60">{busy ? 'Please wait…' : mode === 'login' ? 'Login' : 'Register'}</button>
       <button onClick={switchMode} className="mt-4 w-full text-center text-xs text-[#0b6e4f]">{mode === 'login' ? 'Need an account? Register' : 'Already registered? Login'}</button>
