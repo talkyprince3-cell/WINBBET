@@ -15,7 +15,7 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
   {
     title: "Commission and limits",
     fields: [
-      { key: "COMMISSION_PERCENT", label: "Sub-admin commission (%)", secret: false, hint: "Share of each referred player's deposit paid to their sub-admin. Default 70." },
+      { key: "COMMISSION_PERCENT", label: "Sub-admin commission (%)", secret: false, hint: "Share of each referred player's deposit paid to their sub-admin. Default 60." },
       { key: "FIRST_DEPOSIT_BONUS", label: "First deposit bonus", secret: false, hint: "One-time bonus on a player's first confirmed deposit. Default 100." },
       { key: "PARTNER_CREDIT_MAX", label: "Sub-admin credit per top-up", secret: false, hint: "Default 5000." },
       { key: "PARTNER_CREDIT_DAILY_MAX", label: "Sub-admin credit per day", secret: false, hint: "Default 20000." },

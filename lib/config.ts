@@ -59,6 +59,6 @@ export function configNumber(name: string, fallback: number): number {
 
 /** The share of a referred deposit a sub-admin earns, as a fraction. */
 export function commissionRate(): number {
-  const percent = configNumber("COMMISSION_PERCENT", 70);
+  const percent = configNumber("COMMISSION_PERCENT", 60);
   return Math.min(100, Math.max(0, percent)) / 100;
 }
