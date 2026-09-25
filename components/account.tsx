@@ -71,7 +71,7 @@ function networkFor(phone: string, countryCode: string, networks: string[]) {
 
 const CHIPS: Record<string, number[]> = {
   NGN: [500, 1000, 2000, 5000, 10000],
-  GHS: [50, 100, 200, 500, 1000],
+  GHS: [200, 500, 1000, 2000, 5000],
 }
 const DEFAULT_CHIPS = [2, 5, 10, 50, 100]
 
@@ -404,8 +404,13 @@ export function DepositPage() {
         <AmountField value={amount} onChange={setAmount} currency={currency} min={min} />
         <div className="grid grid-cols-5 gap-2">
           {chips.map((chip) => (
-            <button key={chip} onClick={() => setAmount(String((Number(amount) || 0) + chip))} className="h-10 rounded-lg border border-[#dde7e2] bg-white text-sm font-semibold text-[#0b6e4f]">
-              +{chip.toLocaleString()}
+            <button
+              key={chip}
+              onClick={() => setAmount(String(chip))}
+              aria-pressed={Number(amount) === chip}
+              className={`h-10 rounded-lg border text-sm font-semibold ${Number(amount) === chip ? 'border-[#0b6e4f] bg-[#0b6e4f] text-white' : 'border-[#dde7e2] bg-white text-[#0b6e4f]'}`}
+            >
+              {chip.toLocaleString()}
             </button>
           ))}
         </div>
