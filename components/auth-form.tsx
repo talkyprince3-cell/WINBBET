@@ -27,7 +27,9 @@ export function AuthForm({ mode, onClose, switchMode, onSignedIn }: { mode: 'log
   useEffect(() => {
     const saved = sessionStorage.getItem('sporty-phone')
     if (saved) setIdentifier(saved)
-    setReferral(savedInvite())
+    // Straight from the link when there is one, else the code remembered from an earlier visit.
+    const fromLink = new URLSearchParams(window.location.search).get('invite')
+    setReferral(fromLink ? fromLink.trim().toUpperCase() : savedInvite())
   }, [])
 
   const submit = async () => {
