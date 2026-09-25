@@ -377,7 +377,7 @@ function pick(json: Record<string, unknown> | null, ...paths: string[]): unknown
 const edibytes: GatewayAdapter = {
   id: "edibytes",
   label: "Edibytes",
-  async start({ reference, amount, currency, email, phone, name, redirectUrl }) {
+  async start({ reference, amount, currency, email, name, redirectUrl }) {
     const key = env("EDIBYTES_SECRET_KEY");
     if (!key) return { ok: false, error: "Edibytes is not available right now" };
     const domain = env("EDIBYTES_DOMAIN") ?? new URL(redirectUrl).host;
@@ -393,7 +393,9 @@ const edibytes: GatewayAdapter = {
           reference,
           domain,
           email: email || undefined,
-          phone,
+          // No phone: any valid number makes their initialize endpoint answer
+          // 502 (reproduced live), while the checkout page asks for the
+          // mobile-money number itself.
           name,
           callback_url: redirectUrl,
         }),
@@ -402,6 +404,7 @@ const edibytes: GatewayAdapter = {
       const message = pick(json, "error.message", "message", "detail");
       if (!res.ok) {
         console.error("[edibytes] start refused", res.status, String(message ?? ""), { domain });
+        if (res.status >= 500) return { ok: false, error: "The payment service is busy. Please try again in a minute." };
         const setup = /whitelist|domain|api key|not approved|inactive/i.test(String(message ?? ""));
         return { ok: false, error: setup ? "Deposits are being set up. Please try again shortly." : "Could not start your payment. Please try again." };
       }
