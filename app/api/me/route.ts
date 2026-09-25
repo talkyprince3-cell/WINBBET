@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { getCountry } from "@/lib/countries";
-import { refreshConfig } from "@/lib/config";
+import { configNumber, refreshConfig } from "@/lib/config";
 import { depositGateway } from "@/lib/gateways";
 import { checkWithdrawalGate, qualifiesForApproval } from "@/lib/withdrawals";
 import { linkedSubAdmin } from "@/lib/partner";
@@ -72,5 +72,7 @@ export async function GET(req: Request) {
     },
     partner: partner ?? null,
     tierPoints: Math.floor(tierPoints),
+    // The one-time welcome bonus, shown to players who have not had it yet.
+    welcomeBonus: user.bonus_paid ? 0 : Math.max(0, configNumber("FIRST_DEPOSIT_BONUS", 100)),
   });
 }

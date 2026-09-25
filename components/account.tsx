@@ -33,6 +33,7 @@ type Me = {
     networks: string[]
   }
   withdrawal: { unlocked: boolean; failed: string | null; progress: { have: number; need: number; label: string } }
+  welcomeBonus?: number
 }
 
 function useMe() {
@@ -183,7 +184,7 @@ export function AccountPage() {
       if (!alive) return
       if (json?.status === 'confirmed') {
         if (typeof json.balance === 'number') setBalance(json.balance)
-        notify('Deposit received. Your balance is updated.')
+        notify(Number(json.bonusPaid) > 0 ? `Deposit received, plus your ${formatMoney(Number(json.bonusPaid), player.currency)} welcome bonus! 🎁` : 'Deposit received. Your balance is updated.')
         reload()
         return
       }
@@ -357,11 +358,11 @@ export function DepositPage() {
         <PromptWait
           {...waiting}
           currency={currency}
-          onDone={(result, balance) => {
+          onDone={(result, balance, bonus) => {
             setWaiting(null)
             if (result === 'confirmed') {
               if (typeof balance === 'number') setBalance(balance)
-              notify('Deposit received. Your balance is updated.')
+              notify(bonus ? `Deposit received, plus your ${formatMoney(bonus, currency)} welcome bonus! 🎁` : 'Deposit received. Your balance is updated.')
               reload()
             } else if (result === 'failed') {
               notify('That payment did not go through. No money was taken.')
@@ -401,6 +402,14 @@ export function DepositPage() {
           </>
         )}
         <p className="text-right text-sm text-[#5f6f69]">Balance ({currency}) {Number(me?.user.balance ?? player.balance).toFixed(2)}</p>
+        {Number(me?.welcomeBonus) > 0 && (
+          <div className="flex items-center gap-3 rounded-xl border border-[#ff7a1a]/40 bg-[#fff6ee] px-4 py-3">
+            <span className="text-2xl" aria-hidden="true">🎁</span>
+            <p className="text-[13px] leading-snug text-[#34463f]">
+              <b className="text-[#0f1f1a]">Get {formatMoney(Number(me?.welcomeBonus), currency)} free</b> on your first deposit. It&apos;s added to your balance as soon as your payment is confirmed.
+            </p>
+          </div>
+        )}
         <AmountField value={amount} onChange={setAmount} currency={currency} min={min} />
         <div className="grid grid-cols-5 gap-2">
           {chips.map((chip) => (
@@ -428,7 +437,7 @@ export function DepositPage() {
 }
 
 /** Waits on a mobile-money approval, checking every few seconds for up to three minutes. */
-function PromptWait({ reference, amount, phone, currency, onDone }: { reference: string; amount: number; phone: string; currency: string; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number) => void }) {
+function PromptWait({ reference, amount, phone, currency, onDone }: { reference: string; amount: number; phone: string; currency: string; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number, bonus?: number) => void }) {
   const [seconds, setSeconds] = useState(0)
   const done = useRef(onDone)
   done.current = onDone
@@ -441,7 +450,7 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
       if (!alive) return
       const json = await fetch(`/api/deposits/status?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' }).then((res) => res.json()).catch(() => null)
       if (!alive) return
-      if (json?.status === 'confirmed') return done.current('confirmed', json.balance)
+      if (json?.status === 'confirmed') return done.current('confirmed', json.balance, Number(json.bonusPaid ?? 0))
       if (json?.status === 'failed') return done.current('failed')
       if (Date.now() - started > 180_000) return done.current('timeout')
       setTimeout(check, 4000)
