@@ -356,10 +356,10 @@ const paystack: GatewayAdapter = {
  * Every payment names a domain that must be whitelisted on the Edibytes
  * dashboard; by default it is the host this site is served from.
  *
- * Their success payload was not observable before the account's domain was
- * whitelisted, so the response is read defensively: the usual field names for
- * a checkout link and a status are all tried, and anything unrecognised is
- * logged in full rather than guessed at.
+ * Observed live: initialize answers { id, status: "pending", amount: "100.00",
+ * currency, reference, checkout_url }, and verify answers { status, amount,
+ * channel, paid_at }. Other field names are still tried, and anything
+ * unrecognised is logged in full rather than guessed at.
  */
 function edibytesBase() {
   return (env("EDIBYTES_BASE_URL") ?? "https://api.edibytes.online").replace(/\/+$/, "");
@@ -386,8 +386,9 @@ const edibytes: GatewayAdapter = {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Minor units, as in their own example (500000 for GHS 5,000.00).
-          amount: Math.round(amount * 100),
+          // Whole currency units: a test with amount 100 opened a GH₵100
+          // checkout, so this is cedis, not pesewas.
+          amount: Math.round(amount * 100) / 100,
           currency,
           reference,
           domain,
@@ -433,10 +434,11 @@ const edibytes: GatewayAdapter = {
       if (!confirmed && !failed && raw && !["pending", "processing", "initialized", "initiated", "ongoing"].includes(raw)) {
         console.warn("[edibytes] unknown status", raw, JSON.stringify(json));
       }
-      const minor = Number(pick(json, "data.amount", "amount"));
+      // Reported in whole units too ("100.00" for GH₵100).
+      const paid = Number(pick(json, "data.amount", "amount"));
       return {
         status: confirmed ? "confirmed" : failed ? "failed" : "pending",
-        paidAmount: Number.isFinite(minor) && minor > 0 ? minor / 100 : undefined,
+        paidAmount: Number.isFinite(paid) && paid > 0 ? paid : undefined,
         paidCurrency: pick(json, "data.currency", "currency") as string | undefined,
       };
     } catch {
