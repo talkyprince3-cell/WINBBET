@@ -365,6 +365,13 @@ function edibytesBase() {
   return (env("EDIBYTES_BASE_URL") ?? "https://api.edibytes.online").replace(/\/+$/, "");
 }
 
+/** "0241234567": the local form their charge endpoint accepts. */
+function localGhanaNumber(phone: string): string {
+  const digits = String(phone || "").replace(/\D/g, "");
+  const local = digits.startsWith("233") ? digits.slice(3) : digits.replace(/^0+/, "");
+  return `0${local.slice(-9)}`;
+}
+
 function pick(json: Record<string, unknown> | null, ...paths: string[]): unknown {
   for (const path of paths) {
     let value: unknown = json;
@@ -377,7 +384,7 @@ function pick(json: Record<string, unknown> | null, ...paths: string[]): unknown
 const edibytes: GatewayAdapter = {
   id: "edibytes",
   label: "Edibytes",
-  async start({ reference, amount, currency, email, name, redirectUrl }) {
+  async start({ reference, amount, currency, email, phone, name, redirectUrl }) {
     const key = env("EDIBYTES_SECRET_KEY");
     if (!key) return { ok: false, error: "Edibytes is not available right now" };
     const domain = env("EDIBYTES_DOMAIN") ?? new URL(redirectUrl).host;
@@ -409,13 +416,24 @@ const edibytes: GatewayAdapter = {
         return { ok: false, error: setup ? "Deposits are being set up. Please try again shortly." : "Could not start your payment. Please try again." };
       }
 
-      const url = pick(json, "data.authorization_url", "authorization_url", "data.checkout_url", "checkout_url", "data.payment_url", "payment_url", "data.url", "url");
-      if (typeof url !== "string") {
-        console.error("[edibytes] start: no checkout link in response", JSON.stringify(json));
-        return { ok: false, error: "Could not start checkout" };
-      }
       const id = pick(json, "data.id", "id", "data.access_code", "access_code");
-      return { ok: true, redirectUrl: url, metadata: id ? { edibytesId: id } : undefined };
+      const payRef = String(pick(json, "data.reference", "reference") ?? reference);
+
+      // Send the approval prompt straight to the player's phone, the same call
+      // their hosted page makes on "Pay now", so the player never leaves us.
+      const charge = await fetch(`${edibytesBase()}/api/payments/${encodeURIComponent(payRef)}/charge/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: localGhanaNumber(phone) }),
+      });
+      const chargeJson = (await charge.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!charge.ok) {
+        const reason = String(pick(chargeJson, "error.message", "message", "detail") ?? "");
+        console.error("[edibytes] charge refused", charge.status, reason);
+        if (charge.status >= 500) return { ok: false, error: "The payment service is busy. Please try again in a minute." };
+        return { ok: false, error: reason || "Could not send the payment prompt. Check the number and try again." };
+      }
+      return { ok: true, awaitingPrompt: true, metadata: id ? { edibytesId: id } : undefined };
     } catch (err) {
       console.error("[edibytes] start", err);
       return { ok: false, error: "Could not start checkout" };

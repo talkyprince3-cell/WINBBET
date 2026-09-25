@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -298,8 +298,10 @@ export function AccountPage() {
 
 export function DepositPage() {
   const { player, notify } = useShell()
-  const { me } = useMe()
-  const [amount, setAmount] = useState('')
+  const { me, reload } = useMe()
+  const setBalance = useSession((state) => state.setBalance)
+  const [amount, setAmount] = useState('200')
+  const [waiting, setWaiting] = useState<{ reference: string; amount: number; phone: string } | null>(null)
   const [otherPhone, setOtherPhone] = useState('')
   const [switching, setSwitching] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -337,13 +339,39 @@ export function DepositPage() {
         window.location.href = json.redirectUrl
         return
       }
-      notify(json.awaitingPrompt ? 'Approve the payment prompt on your phone.' : `Deposit started. Reference ${json.reference}.`)
-      setAmount('')
+      if (json.awaitingPrompt && json.reference) {
+        setWaiting({ reference: json.reference, amount: value, phone })
+        return
+      }
+      notify(`Deposit started. Reference ${json.reference}.`)
     } catch {
       setError('Could not start your deposit')
     } finally {
       setBusy(false)
     }
+  }
+
+  if (waiting) {
+    return (
+      <DarkPage title="Deposit" help="/help">
+        <PromptWait
+          {...waiting}
+          currency={currency}
+          onDone={(result, balance) => {
+            setWaiting(null)
+            if (result === 'confirmed') {
+              if (typeof balance === 'number') setBalance(balance)
+              notify('Deposit received. Your balance is updated.')
+              reload()
+            } else if (result === 'failed') {
+              notify('That payment did not go through. No money was taken.')
+            } else {
+              notify('Still waiting on your payment. It will show in your balance once approved.')
+            }
+          }}
+        />
+      </DarkPage>
+    )
   }
 
   const notes = [
@@ -391,6 +419,51 @@ export function DepositPage() {
         )}
       </div>
     </DarkPage>
+  )
+}
+
+/** Waits on a mobile-money approval, checking every few seconds for up to three minutes. */
+function PromptWait({ reference, amount, phone, currency, onDone }: { reference: string; amount: number; phone: string; currency: string; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number) => void }) {
+  const [seconds, setSeconds] = useState(0)
+  const done = useRef(onDone)
+  done.current = onDone
+
+  useEffect(() => {
+    let alive = true
+    const started = Date.now()
+    const tick = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000)
+    const check = async () => {
+      if (!alive) return
+      const json = await fetch(`/api/deposits/status?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' }).then((res) => res.json()).catch(() => null)
+      if (!alive) return
+      if (json?.status === 'confirmed') return done.current('confirmed', json.balance)
+      if (json?.status === 'failed') return done.current('failed')
+      if (Date.now() - started > 180_000) return done.current('timeout')
+      setTimeout(check, 4000)
+    }
+    const first = setTimeout(check, 4000)
+    return () => {
+      alive = false
+      clearInterval(tick)
+      clearTimeout(first)
+    }
+  }, [reference])
+
+  return (
+    <div className="px-4 py-8 text-center sm:px-6">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f5ee]">
+        <Smartphone size={30} className="text-[#0b6e4f]" />
+      </div>
+      <h2 className="mt-4 text-xl font-bold">Approve on your phone</h2>
+      <p className="mt-2 text-[15px] text-[#34463f]">
+        A payment prompt for <b>{formatMoney(amount, currency)}</b> has been sent to <b>+{countryPrefix(phone)} {maskPhoneTail(phone)}</b>. Enter your mobile money PIN to approve it.
+      </p>
+      <div className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-[#5f6f69] shadow-sm">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff7a1a]" /> Waiting for approval · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+      </div>
+      <p className="mt-6 text-[13px] text-[#5f6f69]">No prompt? MTN users can dial *170#, then choose 6 and 3 to approve pending payments.</p>
+      <button onClick={() => onDone('timeout')} className="mt-6 text-sm font-semibold text-[#0b6e4f]">Back to deposit</button>
+    </div>
   )
 }
 
