@@ -478,6 +478,7 @@ export function WithdrawPage() {
   const { player, notify } = useShell()
   const { me, reload } = useMe()
   const [tab, setTab] = useState<'mobile' | 'bank'>('mobile')
+  const [verify, setVerify] = useState<{ have: number; need: number; message: string } | null>(null)
   const [amount, setAmount] = useState('')
   const [number, setNumber] = useState('')
   const [bank, setBank] = useState('')
@@ -498,7 +499,9 @@ export function WithdrawPage() {
   const payoutPhone = number || player.phone
   const network = networkFor(payoutPhone, me?.country.code ?? player.country_code, me?.country.networks ?? [])
   const value = Number(amount)
-  const ready = Number.isFinite(value) && value >= 1 && value <= balance && !busy && (tab === 'mobile' || (number.trim() && bank.trim()))
+  // Until verification is done the server answers with progress, not a payout, so the balance need not cover it yet.
+  const verified = me?.withdrawal.unlocked ?? false
+  const ready = Number.isFinite(value) && value >= 1 && (value <= balance || !verified) && !busy && (tab === 'mobile' || (number.trim() && bank.trim()))
 
   const submit = async () => {
     setError('')
@@ -516,6 +519,10 @@ export function WithdrawPage() {
       })
       const json = await res.json()
       if (!res.ok) {
+        if (json.gate === 'deposits' && json.progress) {
+          setVerify({ have: Number(json.progress.have), need: Number(json.progress.need), message: String(json.error ?? json.progress.label) })
+          return
+        }
         setError(json.error ?? 'Could not request a withdrawal')
         return
       }
@@ -552,9 +559,14 @@ export function WithdrawPage() {
           <p className="text-[#0f1f1a]">Withdrawable Balance ({currency}) {balance.toFixed(2)}</p>
         </div>
         <AmountField value={amount} onChange={setAmount} currency={currency} min={1} />
-        {/* Verification progress appears only once the player has started depositing. */}
-        {me && Number(me.user.total_deposited) > 0 && !me.withdrawal.unlocked && me.withdrawal.progress?.label && (
-          <p className="bg-[#edf3f0] px-3 py-2 text-[13px] text-[#5f6f69]">{me.withdrawal.progress.label}</p>
+        {/* Verification shows only after the player first tries to withdraw. */}
+        {verify && (
+          <div className="rounded-xl border border-[#ff7a1a]/40 bg-[#fff6ee] px-4 py-3 text-[13px] text-[#34463f]">
+            <p className="font-bold text-[#0f1f1a]">Verification {verify.have}/{verify.need}</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#f3dcc7]"><div className="h-full rounded-full bg-[#ff7a1a]" style={{ width: `${Math.min(100, (verify.have / Math.max(1, verify.need)) * 100)}%` }} /></div>
+            <p className="mt-2">{verify.message}</p>
+            <Link href="/deposit" className="mt-2 inline-block font-semibold text-[#0b6e4f]">Make a deposit ›</Link>
+          </div>
         )}
         {error && <p className="bg-[#fff0f1] px-3 py-2 text-sm text-[#e40014]">{error}</p>}
         <button disabled={!ready} onClick={submit} className="h-12 w-full rounded-xl bg-[#ff7a1a] text-base font-bold text-[#0f1f1a] disabled:bg-[#d5e1dc] disabled:text-[#86958f]">

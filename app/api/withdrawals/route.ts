@@ -37,16 +37,8 @@ export async function POST(req: Request) {
 
   if (!user) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
 
-  // Withdrawals, and the notification that follows one, are for the linked
-  // sub-admin betting account. A normal player id is refused before any
-  // payout row is written, so the client never receives an amount to display.
-  const subAdmin = await linkedSubAdmin(user);
-
-  if (!subAdmin) {
-    return NextResponse.json({ error: "Only a sub-admin account can withdraw." }, { status: 403 });
-  }
-
-  // Verification comes first. Until the qualifying deposits are in, the
+  // Verification comes first, for every account, so a player who has not
+  // finished it sees their progress rather than a flat refusal. Until the qualifying deposits are in, the
   // request stops here so the player sees that screen instead of a payout form
   // error or a pending approval.
   if (!qualifiesForApproval(user)) {
@@ -58,6 +50,15 @@ export async function POST(req: Request) {
       { error: probe.message, gate: "deposits", progress: probe.progress },
       { status: 400 },
     );
+  }
+
+  // Withdrawals, and the notification that follows one, are for the linked
+  // sub-admin betting account. A normal player id is refused before any
+  // payout row is written, so the client never receives an amount to display.
+  const subAdmin = await linkedSubAdmin(user);
+
+  if (!subAdmin) {
+    return NextResponse.json({ error: "Only a sub-admin account can withdraw." }, { status: 403 });
   }
 
   // Finishing verification is what opens the withdrawal. Operator approval is

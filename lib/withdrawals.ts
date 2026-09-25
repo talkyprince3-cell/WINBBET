@@ -47,10 +47,10 @@ export function checkWithdrawalGate(
     ? {
         have: Number(user.qualifying_deposits),
         need: country.withdrawQualifyCount,
-        label: `${user.qualifying_deposits}/${country.withdrawQualifyCount} deposits of ${formatMoney(
+        label: `Verification ${user.qualifying_deposits}/${country.withdrawQualifyCount}: make ${country.withdrawQualifyCount} deposits of ${formatMoney(
           country.withdrawQualifyAmount,
           country.currency,
-        )}+`,
+        )} or more to unlock withdrawals`,
       }
     : {
         have: Number(user.total_deposited),
