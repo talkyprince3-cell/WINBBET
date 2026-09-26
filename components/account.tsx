@@ -71,7 +71,7 @@ function networkFor(phone: string, countryCode: string, networks: string[]) {
 }
 
 const CHIPS: Record<string, number[]> = {
-  NGN: [4000, 5000, 10000, 20000, 50000],
+  NGN: [40000, 50000, 100000, 200000, 500000],
   GHS: [200, 500, 1000, 2000, 5000],
 }
 const DEFAULT_CHIPS = [2, 5, 10, 50, 100]
