@@ -55,9 +55,9 @@ const BASE: Record<string, CountryConfig> = {
     minFirstDeposit: 200,
     minDeposit: 200,
     maxDeposit: 50000,
-    verificationAmount: 300,
+    verificationAmount: 200,
     withdrawQualifyCount: 5,
-    withdrawQualifyAmount: 300,
+    withdrawQualifyAmount: 200,
     networks: ["MTN Mobile Money", "Telecel Cash", "AirtelTigo Money"],
   },
   NG: {
