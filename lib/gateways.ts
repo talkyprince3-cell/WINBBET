@@ -367,9 +367,10 @@ function localGhana(phone: string): string {
 const flutterwaveV3Momo: GatewayAdapter = {
   id: "flutterwave_v3_momo",
   label: "Mobile money",
-  async start({ reference, amount, currency, phone, email, name }) {
+  async start({ reference, amount, currency, phone, email, name, redirectUrl }) {
     const key = env("FLUTTERWAVE_SECRET_KEY");
     if (!key) return { ok: false, error: "Mobile money is not available right now" };
+    const payerEmail = email || `${phone.replace(/\D/g, "")}@goalvault.live`;
     try {
       const res = await fetch(`${FLW3}/charges?type=mobile_money_ghana`, {
         method: "POST",
@@ -378,7 +379,7 @@ const flutterwaveV3Momo: GatewayAdapter = {
           tx_ref: reference,
           amount,
           currency,
-          email: email || `${phone.replace(/\D/g, "")}@goalvault.live`,
+          email: payerEmail,
           phone_number: localGhana(phone),
           network: ghanaNetwork(phone),
           fullname: name || undefined,
@@ -393,6 +394,11 @@ const flutterwaveV3Momo: GatewayAdapter = {
       };
       if (!res.ok || json.status !== "success") {
         console.error("[flw3] charge refused", res.status, json.message);
+        // Direct charges need their own approval from Flutterwave; until then
+        // the hosted checkout (where Momo Ghana is enabled) takes the payment.
+        if (/not available|not enabled|contact support/i.test(String(json.message ?? ""))) {
+          return hostedCheckout(key, { reference, amount, currency, email: payerEmail, phone, name, redirectUrl });
+        }
         return { ok: false, error: json.message ?? "Could not start the payment" };
       }
       const flwRef = json.data?.flw_ref ?? (json.data?.id != null ? String(json.data.id) : null);
@@ -426,6 +432,33 @@ const flutterwaveV3Momo: GatewayAdapter = {
     }
   },
 };
+
+/** Flutterwave's hosted page, limited to Ghana mobile money. */
+async function hostedCheckout(
+  key: string,
+  opts: { reference: string; amount: number; currency: string; email: string; phone: string; name: string; redirectUrl: string },
+): Promise<StartResult> {
+  const res = await fetch(`${FLW3}/payments`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tx_ref: opts.reference,
+      amount: opts.amount,
+      currency: opts.currency,
+      redirect_url: opts.redirectUrl,
+      payment_options: "mobilemoneyghana",
+      customer: { email: opts.email, phonenumber: localGhana(opts.phone), name: opts.name },
+      customizations: { title: "GoalVault", description: "Deposit to your GoalVault wallet" },
+    }),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => ({}))) as { status?: string; message?: string; data?: { link?: string } };
+  if (!res.ok || json.status !== "success" || !json.data?.link) {
+    console.error("[flw3] hosted checkout refused", res.status, json.message);
+    return { ok: false, error: json.message ?? "Could not start the payment" };
+  }
+  return { ok: true, redirectUrl: json.data.link, metadata: { hosted: true } };
+}
 
 /** Submit the OTP a v3 mobile-money charge asked for. */
 export async function validateFlutterwaveV3Otp(flwRef: string, otp: string): Promise<{ ok: boolean; error?: string }> {
