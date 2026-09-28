@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { refreshConfig } from "@/lib/config";
-import { authorizeCharge, type Authorization } from "@/lib/flutterwave-v4";
+import { authorizeCharge, type Authorization, withFlutterwaveAccount } from "@/lib/flutterwave-v4";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,11 @@ export const dynamic = "force-dynamic";
  * with the charge, and comes back here to be answered.
  */
 export async function POST(req: Request) {
+  // Card deposits are Nigerian, and run on Nigeria's Flutterwave account.
+  return withFlutterwaveAccount("NG", () => handle(req));
+}
+
+async function handle(req: Request) {
   await refreshConfig();
   const supabase = db();
   if (!supabase) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });

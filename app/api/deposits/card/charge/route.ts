@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { refreshConfig } from "@/lib/config";
 import { getCountry } from "@/lib/countries";
-import { createCardPaymentMethod, createCharge, createCustomer } from "@/lib/flutterwave-v4";
+import { createCardPaymentMethod, createCharge, createCustomer, withFlutterwaveAccount } from "@/lib/flutterwave-v4";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,11 @@ export const dynamic = "force-dynamic";
  * authorization step and the status poll have something to ask about.
  */
 export async function POST(req: Request) {
+  // Card deposits are Nigerian, and run on Nigeria's Flutterwave account.
+  return withFlutterwaveAccount("NG", () => handle(req));
+}
+
+async function handle(req: Request) {
   await refreshConfig();
   const supabase = db();
   if (!supabase) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });

@@ -12,6 +12,7 @@ import { config } from "./config";
  * same adapter shape every other rail uses.
  */
 import { createCipheriv, randomBytes, randomUUID } from "crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 const IDP = "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
 const SANDBOX = "https://developersandbox-api.flutterwave.com";
@@ -19,6 +20,23 @@ const LIVE = "https://f4bexperience.flutterwave.com";
 
 function env(name: string): string | undefined {
   return config(name);
+}
+
+/**
+ * Each country can have its own Flutterwave account. Inside
+ * `withFlutterwaveAccount("GH", ...)` every credential is read as
+ * FLUTTERWAVE_CLIENT_ID_GH and so on first, falling back to the unsuffixed
+ * default account when the country has none of its own.
+ */
+const accountScope = new AsyncLocalStorage<string>();
+
+export function withFlutterwaveAccount<T>(country: string, fn: () => T): T {
+  return accountScope.run(country.toUpperCase(), fn);
+}
+
+function scoped(name: string): string | undefined {
+  const account = accountScope.getStore();
+  return (account ? env(`${name}_${account}`) : undefined) ?? env(name);
 }
 
 /**
@@ -30,7 +48,7 @@ function env(name: string): string | undefined {
  */
 function credential(kind: "CLIENT_ID" | "CLIENT_SECRET"): string | undefined {
   // The short name first: it is the one the admin console saves under.
-  return env(`FLUTTERWAVE_${kind}`) ?? env(`FLUTTERWAVE_V4_${kind}`);
+  return scoped(`FLUTTERWAVE_${kind}`) ?? env(`FLUTTERWAVE_V4_${kind}`);
 }
 
 function baseUrl(): string {
@@ -48,7 +66,7 @@ export function v4Configured(): boolean {
 
 /** Cards need one thing more: the key their details are sealed with. */
 export function cardsConfigured(): boolean {
-  return v4Configured() && Boolean(env("FLUTTERWAVE_ENCRYPTION_KEY"));
+  return v4Configured() && Boolean(scoped("FLUTTERWAVE_ENCRYPTION_KEY"));
 }
 
 // ------------------------------------------------------------------- auth
@@ -57,14 +75,16 @@ export function cardsConfigured(): boolean {
  * Access tokens live ten minutes. One is cached and reused, and retired a
  * minute early so a call never sets off with a token that expires mid-flight.
  */
-let cached: { token: string; expiresAt: number } | null = null;
+const tokens = new Map<string, { token: string; expiresAt: number }>();
 
 async function accessToken(): Promise<string | null> {
-  if (cached && cached.expiresAt > Date.now()) return cached.token;
-
   const clientId = credential("CLIENT_ID");
   const clientSecret = credential("CLIENT_SECRET");
   if (!clientId || !clientSecret) return null;
+
+  // One token per account, so Ghana and Nigeria never borrow each other's.
+  const cached = tokens.get(clientId);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
 
   try {
     const res = await fetch(IDP, {
@@ -82,8 +102,9 @@ async function accessToken(): Promise<string | null> {
       return null;
     }
     const ttl = Number(json.expires_in) || 600;
-    cached = { token: String(json.access_token), expiresAt: Date.now() + (ttl - 60) * 1000 };
-    return cached.token;
+    const fresh = { token: String(json.access_token), expiresAt: Date.now() + (ttl - 60) * 1000 };
+    tokens.set(clientId, fresh);
+    return fresh.token;
   } catch (err) {
     console.error("[flw4] token request threw", err);
     return null;
@@ -163,7 +184,7 @@ export function encryptionNonce(): string {
  * appended. Each field is encrypted on its own under the same nonce.
  */
 export function encryptField(value: string, nonce: string): string {
-  const raw = env("FLUTTERWAVE_ENCRYPTION_KEY");
+  const raw = scoped("FLUTTERWAVE_ENCRYPTION_KEY");
   if (!raw) throw new Error("FLUTTERWAVE_ENCRYPTION_KEY is not set");
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) throw new Error("FLUTTERWAVE_ENCRYPTION_KEY must be a base64-encoded 32-byte key");

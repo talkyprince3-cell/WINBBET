@@ -45,7 +45,15 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
     fields: [{ key: "API_FOOTBALL_KEY", label: "API-Football key", secret: true }],
   },
   {
-    title: "Flutterwave",
+    title: "Flutterwave · Ghana mobile money",
+    fields: [
+      { key: "FLUTTERWAVE_CLIENT_ID_GH", label: "Client ID (Ghana)", secret: false, hint: "Leave empty to use the main account below." },
+      { key: "FLUTTERWAVE_CLIENT_SECRET_GH", label: "Client secret (Ghana)", secret: true },
+      { key: "FLUTTERWAVE_ENCRYPTION_KEY_GH", label: "Encryption key (Ghana)", secret: true },
+    ],
+  },
+  {
+    title: "Flutterwave · Nigeria cards (main account)",
     fields: [
       { key: "FLUTTERWAVE_CLIENT_ID", label: "Client ID (v4)", secret: false },
       { key: "FLUTTERWAVE_CLIENT_SECRET", label: "Client secret (v4)", secret: true },

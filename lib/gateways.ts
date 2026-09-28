@@ -9,6 +9,7 @@ import {
   findChargeByReference,
   getCharge,
   v4Configured,
+  withFlutterwaveAccount,
 } from "./flutterwave-v4";
 
 /**
@@ -484,9 +485,18 @@ const manual: GatewayAdapter = {
   },
 };
 
+/** Run an adapter against one country's Flutterwave account. */
+function onAccount(adapter: GatewayAdapter, country: string): GatewayAdapter {
+  return {
+    ...adapter,
+    start: (opts) => withFlutterwaveAccount(country, () => adapter.start(opts)),
+    status: (reference, meta) => withFlutterwaveAccount(country, () => adapter.status(reference, meta)),
+  };
+}
+
 const ADAPTERS: Record<Gateway, GatewayAdapter> = {
-  flutterwave_momo: flutterwaveMomo,
-  flutterwave_card: flutterwaveCard,
+  flutterwave_momo: onAccount(flutterwaveMomo, "GH"),
+  flutterwave_card: onAccount(flutterwaveCard, "NG"),
   korapay,
   moolre,
   paystack,
@@ -530,9 +540,9 @@ export function depositGateway(countryCode: string, fallback: Gateway): Gateway 
 function hasKeys(gateway: Gateway): boolean {
   switch (gateway) {
     case "flutterwave_momo":
-      return v4Configured();
+      return withFlutterwaveAccount("GH", () => v4Configured());
     case "flutterwave_card":
-      return cardsConfigured();
+      return withFlutterwaveAccount("NG", () => cardsConfigured());
     case "edibytes":
       return Boolean(env("EDIBYTES_SECRET_KEY"));
     case "paystack":
