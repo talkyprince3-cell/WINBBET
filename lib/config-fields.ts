@@ -30,7 +30,7 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
         secret: false,
         hint: "Leave on the default unless the other gateway's keys are live and working.",
         options: [
-          { value: "", label: "Default (Flutterwave mobile money)" },
+          { value: "", label: "Default (Flutterwave mobile money v3)" },
           { value: "flutterwave_momo", label: "Flutterwave mobile money (v4)" },
           { value: "flutterwave_v3_momo", label: "Flutterwave mobile money (v3)" },
           { value: "edibytes", label: "Edibytes checkout" },
