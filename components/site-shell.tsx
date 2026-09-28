@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ChevronDown, Gamepad2, Headphones, House, Menu, ReceiptText, UserRound, X } from 'lucide-react'
 import { AuthForm } from '@/components/auth-form'
 import { BrandLogo } from '@/components/brand'
+import { BalanceText, BalanceToggle } from '@/components/balance'
 import { SiteFooter } from '@/components/info-pages'
 import { WinCelebration, hasCelebrated, markCelebrated } from '@/components/tickets'
 import { formatMoney } from '@/lib/countries'
@@ -164,7 +165,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
             <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
               {player ? (
                 <>
-                  <span className="truncate text-xs font-semibold sm:text-sm">{formatMoney(player.balance, player.currency)}</span>
+                  <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className="truncate"><BalanceText>{formatMoney(player.balance, player.currency)}</BalanceText></span><BalanceToggle size={15} className="text-white/80" /></span>
                   <Link href="/deposit" className="flex h-8 shrink-0 items-center rounded-full bg-[#ff7a1a] px-3.5 text-xs font-bold text-[#0f1f1a] sm:h-9 sm:px-4 sm:text-sm">Deposit</Link>
                   <button onClick={() => signOut()} className="hidden h-9 px-3 text-sm font-semibold sm:block">Logout</button>
                 </>

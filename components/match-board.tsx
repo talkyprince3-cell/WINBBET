@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Lock, Trophy } from 'lucide-react'
 import { useShell } from '@/components/site-shell'
+import { BalanceText, BalanceToggle } from '@/components/balance'
 import { BookedCode, PlacedReceipt, type PlacedTicket } from '@/components/tickets'
 import { bonusAmount, combinationCount, combinations } from '@/lib/bonus'
 import { matchClock } from '@/lib/clock'
@@ -147,7 +148,7 @@ export function QuickRegister({ onNeedAuth, onNotice }: { onNeedAuth: () => void
     return (
       <aside className="hidden rounded-2xl border border-[#dde7e2] bg-white p-4 text-[#0f1f1a] md:block">
         <h2 className="text-sm font-bold">{player.name}</h2>
-        <p className="my-3 text-xs font-semibold text-[#0b9b3a]">{formatMoney(player.balance, player.currency)} available</p>
+        <p className="my-3 flex items-center gap-1.5 text-xs font-semibold text-[#0b9b3a]"><BalanceText>{formatMoney(player.balance, player.currency)}</BalanceText> available <BalanceToggle size={13} /></p>
         <p className="text-xs text-[#6b7077]">Deposit, then add a selection from the board.</p>
       </aside>
     )

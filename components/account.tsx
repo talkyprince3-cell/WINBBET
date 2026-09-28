@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { NeedSignIn } from '@/components/player-panels'
 import { useShell } from '@/components/site-shell'
+import { BalanceText, BalanceToggle } from '@/components/balance'
 import { formatMoney, ghanaNetwork, maskPhoneTail } from '@/lib/countries'
 import { useSession } from '@/lib/store'
 
@@ -164,7 +165,6 @@ export function AccountPage() {
   const signOut = useSession((state) => state.signOut)
   const router = useRouter()
   const { me, reload } = useMe()
-  const [hidden, setHidden] = useState(false)
   const { notify } = useShell()
   const setBalance = useSession((state) => state.setBalance)
 
@@ -248,10 +248,8 @@ export function AccountPage() {
           <div className="mt-5 flex items-center justify-between">
             <span className="text-sm">Total Balance</span>
             <span className="flex items-center gap-2 text-2xl font-bold">
-              {hidden ? '••••' : balance}
-              <button onClick={() => setHidden((value) => !value)} aria-label={hidden ? 'Show balance' : 'Hide balance'}>
-                {hidden ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              <BalanceText>{balance}</BalanceText>
+              <BalanceToggle size={18} />
             </span>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
@@ -401,7 +399,7 @@ export function DepositPage() {
             )}
           </>
         )}
-        <p className="text-right text-sm text-[#5f6f69]">Balance ({currency}) {Number(me?.user.balance ?? player.balance).toFixed(2)}</p>
+        <p className="flex items-center justify-end gap-1.5 text-sm text-[#5f6f69]">Balance ({currency}) <BalanceText>{Number(me?.user.balance ?? player.balance).toFixed(2)}</BalanceText> <BalanceToggle size={14} /></p>
         {Number(me?.welcomeBonus) > 0 && (
           <div className="flex items-center gap-3 rounded-xl border border-[#ff7a1a]/40 bg-[#fff6ee] px-4 py-3">
             <span className="text-2xl" aria-hidden="true">🎁</span>
@@ -564,8 +562,8 @@ export function WithdrawPage() {
           </>
         )}
         <div className="space-y-1 text-right text-sm text-[#5f6f69]">
-          <p>Balance ({currency}) {balance.toFixed(2)}</p>
-          <p className="text-[#0f1f1a]">Withdrawable Balance ({currency}) {balance.toFixed(2)}</p>
+          <p className="flex items-center justify-end gap-1.5">Balance ({currency}) <BalanceText>{balance.toFixed(2)}</BalanceText> <BalanceToggle size={14} /></p>
+          <p className="text-[#0f1f1a]">Withdrawable Balance ({currency}) <BalanceText>{balance.toFixed(2)}</BalanceText></p>
         </div>
         <AmountField value={amount} onChange={setAmount} currency={currency} min={1} />
         {/* Verification shows only after the player first tries to withdraw. */}
@@ -681,7 +679,7 @@ export function OpenBetsPage({ initialTab = 'open' }: { initialTab?: 'open' | 'h
       <div className="mx-auto max-w-[560px] px-4 pb-6">
         <div className="flex items-center justify-between py-3 text-sm">
           <Link href="/help" className="flex items-center gap-1.5 text-[#0f1f1a]"><CircleHelp size={17} /> How to Cashout?</Link>
-          <span className="font-semibold text-[#0b6e4f]">{formatMoney(player.balance, player.currency)}</span>
+          <span className="flex items-center gap-1.5 font-semibold text-[#0b6e4f]"><BalanceText>{formatMoney(player.balance, player.currency)}</BalanceText><BalanceToggle size={15} /></span>
         </div>
         <div className="grid grid-cols-2 gap-1">
           {([['open', `Open Bets (${open.length})`], ['history', 'Bet History']] as const).map(([key, label]) => (

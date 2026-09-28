@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ShieldCheck } from 'lucide-react'
 import { useShell } from '@/components/site-shell'
+import { BalanceText, BalanceToggle } from '@/components/balance'
 import {
   CRASH_MAX, MAX_STAKE, MIN_STAKE, PLINKO_BINS, ROULETTE_REDS, WHEEL_SEGMENTS,
   crashMultiplierAt, findGame, type CasinoGame,
@@ -114,7 +115,7 @@ export function GamePlay({ slug }: { slug: string }) {
               </div>
               <div className="ml-auto shrink-0 text-right">
                 <p className="text-[11px] uppercase text-white/70">Balance</p>
-                <p className="font-black">{player ? formatMoney(player.balance, player.currency) : '—'}</p>
+                <p className="flex items-center justify-end gap-1.5 font-black">{player ? <><BalanceText>{formatMoney(player.balance, player.currency)}</BalanceText><BalanceToggle size={14} className="text-white/80" /></> : '—'}</p>
               </div>
             </div>
             <div className="p-3 sm:p-5">
