@@ -12,6 +12,7 @@ export type Gateway =
   | "moolre"
   | "paystack"
   | "edibytes"
+  | "flutterwave_v3_momo"
   | "manual";
 
 export type KycKind = "bvn" | "nin" | "national_id";

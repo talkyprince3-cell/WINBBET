@@ -348,6 +348,99 @@ const paystack: GatewayAdapter = {
   },
 };
 
+// ------------------------------------------------------- Flutterwave v3
+
+/**
+ * Flutterwave v3 Ghana mobile money, for accounts where v4 is not enabled for
+ * mobile money. Same flow as the site this was taken from: charge the wallet,
+ * the player approves the prompt (or types an OTP some networks send), and the
+ * outcome is read back by our own reference.
+ */
+const FLW3 = "https://api.flutterwave.com/v3";
+
+function localGhana(phone: string): string {
+  const digits = String(phone || "").replace(/\D/g, "");
+  const local = digits.startsWith("233") ? digits.slice(3) : digits.replace(/^0+/, "");
+  return `0${local.slice(-9)}`;
+}
+
+const flutterwaveV3Momo: GatewayAdapter = {
+  id: "flutterwave_v3_momo",
+  label: "Mobile money",
+  async start({ reference, amount, currency, phone, email, name }) {
+    const key = env("FLUTTERWAVE_SECRET_KEY");
+    if (!key) return { ok: false, error: "Mobile money is not available right now" };
+    try {
+      const res = await fetch(`${FLW3}/charges?type=mobile_money_ghana`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tx_ref: reference,
+          amount,
+          currency,
+          email: email || `${phone.replace(/\D/g, "")}@goalvault.live`,
+          phone_number: localGhana(phone),
+          network: ghanaNetwork(phone),
+          fullname: name || undefined,
+        }),
+        cache: "no-store",
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        message?: string;
+        data?: { flw_ref?: string; id?: number; status?: string };
+        meta?: { authorization?: { redirect?: string; mode?: string } };
+      };
+      if (!res.ok || json.status !== "success") {
+        console.error("[flw3] charge refused", res.status, json.message);
+        return { ok: false, error: json.message ?? "Could not start the payment" };
+      }
+      const flwRef = json.data?.flw_ref ?? (json.data?.id != null ? String(json.data.id) : null);
+      const auth = json.meta?.authorization;
+      const metadata = { flw_ref: flwRef, flw_id: json.data?.id ?? null };
+      if (auth?.mode === "redirect" && auth.redirect) return { ok: true, redirectUrl: auth.redirect, metadata };
+      if (auth?.mode === "otp") return { ok: true, awaitingOtp: true, awaitingPrompt: true, metadata };
+      return { ok: true, awaitingPrompt: true, metadata };
+    } catch (err) {
+      console.error("[flw3] charge threw", err);
+      return { ok: false, error: "Could not start the payment" };
+    }
+  },
+  async status(reference) {
+    const key = env("FLUTTERWAVE_SECRET_KEY");
+    if (!key) return { status: "pending" };
+    try {
+      const res = await fetch(`${FLW3}/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`, {
+        headers: { Authorization: `Bearer ${key}` },
+        cache: "no-store",
+      });
+      const json = (await res.json().catch(() => ({}))) as { status?: string; data?: { status?: string; amount?: number; currency?: string } };
+      const s = String(json.data?.status ?? "").toLowerCase();
+      return {
+        status: s === "successful" ? "confirmed" : s === "failed" || s === "cancelled" ? "failed" : "pending",
+        paidAmount: Number(json.data?.amount) > 0 ? Number(json.data?.amount) : undefined,
+        paidCurrency: json.data?.currency,
+      };
+    } catch {
+      return { status: "pending" };
+    }
+  },
+};
+
+/** Submit the OTP a v3 mobile-money charge asked for. */
+export async function validateFlutterwaveV3Otp(flwRef: string, otp: string): Promise<{ ok: boolean; error?: string }> {
+  const key = env("FLUTTERWAVE_SECRET_KEY");
+  if (!key) return { ok: false, error: "Mobile money is not available right now" };
+  const res = await fetch(`${FLW3}/validate-charge`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "mobile_money_ghana", flw_ref: flwRef, otp }),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => ({}))) as { status?: string; message?: string };
+  return res.ok && json.status === "success" ? { ok: true } : { ok: false, error: json.message ?? "That code was not accepted" };
+}
+
 // ---------------------------------------------------------------- Edibytes
 
 /**
@@ -501,6 +594,7 @@ const ADAPTERS: Record<Gateway, GatewayAdapter> = {
   moolre,
   paystack,
   edibytes,
+  flutterwave_v3_momo: flutterwaveV3Momo,
   manual,
 };
 
@@ -545,6 +639,8 @@ function hasKeys(gateway: Gateway): boolean {
       return withFlutterwaveAccount("NG", () => cardsConfigured());
     case "edibytes":
       return Boolean(env("EDIBYTES_SECRET_KEY"));
+    case "flutterwave_v3_momo":
+      return Boolean(env("FLUTTERWAVE_SECRET_KEY"));
     case "paystack":
       return Boolean(env("PAYSTACK_SECRET_KEY"));
     case "korapay":

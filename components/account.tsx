@@ -300,7 +300,7 @@ export function DepositPage() {
   const { me, reload } = useMe()
   const setBalance = useSession((state) => state.setBalance)
   const [amount, setAmount] = useState('200')
-  const [waiting, setWaiting] = useState<{ reference: string; amount: number; phone: string } | null>(null)
+  const [waiting, setWaiting] = useState<{ reference: string; amount: number; phone: string; otp?: boolean } | null>(null)
   const [otherPhone, setOtherPhone] = useState('')
   const [switching, setSwitching] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -339,7 +339,7 @@ export function DepositPage() {
         return
       }
       if (json.awaitingPrompt && json.reference) {
-        setWaiting({ reference: json.reference, amount: value, phone })
+        setWaiting({ reference: json.reference, amount: value, phone, otp: Boolean(json.awaitingOtp) })
         return
       }
       notify(`Deposit started. Reference ${json.reference}.`)
@@ -435,8 +435,13 @@ export function DepositPage() {
 }
 
 /** Waits on a mobile-money approval, checking every few seconds for up to three minutes. */
-function PromptWait({ reference, amount, phone, currency, onDone }: { reference: string; amount: number; phone: string; currency: string; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number, bonus?: number) => void }) {
+function PromptWait({ reference, amount, phone, currency, otp: needsOtp = false, onDone }: { reference: string; amount: number; phone: string; currency: string; otp?: boolean; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number, bonus?: number) => void }) {
   const [seconds, setSeconds] = useState(0)
+  const { player } = useShell()
+  const [askOtp, setAskOtp] = useState(needsOtp)
+  const [code, setCode] = useState('')
+  const [otpBusy, setOtpBusy] = useState(false)
+  const [otpError, setOtpError] = useState('')
   const done = useRef(onDone)
   done.current = onDone
 
@@ -473,6 +478,26 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
       <div className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-[#5f6f69] shadow-sm">
         <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff7a1a]" /> Waiting for approval · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
       </div>
+      {askOtp && (
+        <form
+          className="mx-auto mt-6 max-w-[320px] space-y-2 text-left"
+          onSubmit={async (event) => {
+            event.preventDefault()
+            setOtpError('')
+            setOtpBusy(true)
+            const res = await fetch('/api/deposits/otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference, userId: player?.id, otp: code }) })
+            const json = await res.json().catch(() => ({}))
+            setOtpBusy(false)
+            if (!res.ok) return setOtpError(json.error ?? 'That code was not accepted')
+            setAskOtp(false)
+          }}
+        >
+          <label className="block text-sm font-semibold">Enter the code sent to your phone</label>
+          <input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" className="h-12 w-full rounded-xl border border-[#dde7e2] bg-white px-4 text-center text-lg tracking-[0.3em] outline-none focus:border-[#0b6e4f]" />
+          {otpError && <p className="text-sm text-[#e40014]">{otpError}</p>}
+          <button disabled={otpBusy || code.length < 4} className="h-11 w-full rounded-xl bg-[#ff7a1a] text-sm font-bold text-[#0f1f1a] disabled:opacity-50">{otpBusy ? 'Checking…' : 'Confirm code'}</button>
+        </form>
+      )}
       <p className="mt-6 text-[13px] text-[#5f6f69]">No prompt? MTN users can dial *170#, then choose 6 and 3 to approve pending payments.</p>
       <button onClick={() => onDone('timeout')} className="mt-6 text-sm font-semibold text-[#0b6e4f]">Back to deposit</button>
     </div>

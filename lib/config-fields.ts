@@ -31,7 +31,8 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
         hint: "Leave on the default unless the other gateway's keys are live and working.",
         options: [
           { value: "", label: "Default (Flutterwave mobile money)" },
-          { value: "flutterwave_momo", label: "Flutterwave mobile money" },
+          { value: "flutterwave_momo", label: "Flutterwave mobile money (v4)" },
+          { value: "flutterwave_v3_momo", label: "Flutterwave mobile money (v3)" },
           { value: "edibytes", label: "Edibytes checkout" },
           { value: "paystack", label: "Paystack checkout" },
           { value: "korapay", label: "Korapay checkout" },
@@ -59,7 +60,7 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
       { key: "FLUTTERWAVE_CLIENT_SECRET", label: "Client secret (v4)", secret: true },
       { key: "FLUTTERWAVE_ENCRYPTION_KEY", label: "Encryption key", secret: true },
       { key: "FLUTTERWAVE_WEBHOOK_HASH", label: "Webhook secret hash", secret: true },
-      { key: "FLUTTERWAVE_SECRET_KEY", label: "Secret key (v3)", secret: true },
+      { key: "FLUTTERWAVE_SECRET_KEY", label: "Secret key (v3)", secret: true, hint: "FLWSECK-… Used by \"Flutterwave mobile money (v3)\" for Ghana." },
       { key: "FLUTTERWAVE_ENV", label: "Environment", secret: false, hint: "Type sandbox for testing. Anything else is live." },
     ],
   },
