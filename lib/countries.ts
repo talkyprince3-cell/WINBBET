@@ -46,11 +46,10 @@ const BASE: Record<string, CountryConfig> = {
     currencySymbol: "GH₵",
     dialCode: "233",
     phoneDigits: 9,
-    // Ghana mobile money goes through Flutterwave v3 — the account is not
-    // enabled for direct MoMo charges on v4. The operator can switch rails
-    // with DEPOSIT_GATEWAY_GH in the console (flutterwave_momo once v4 is
-    // enabled, or edibytes).
-    gateway: "flutterwave_v3_momo",
+    // Ghana mobile money is taken through Edibytes (AlphaPay). The operator
+    // can switch rails with DEPOSIT_GATEWAY_GH in the console — the
+    // Flutterwave v3 and v4 adapters stay wired.
+    gateway: "edibytes",
     payoutRail: "mobile",
     // Ghana collects no KYC value at sign-up; identity is carried by the
     // mobile-money number, which is already name-verified by the network.
