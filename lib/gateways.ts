@@ -143,6 +143,33 @@ const flutterwaveCard: GatewayAdapter = {
  * channel, paid_at }. Other field names are still tried, and anything
  * unrecognised is logged in full rather than guessed at.
  */
+/** The verification code some networks text before releasing a payment. */
+export async function edibytesVerifyCode(reference: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${edibytesBase()}/api/payments/${encodeURIComponent(reference)}/verify-otp/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (res.ok) return { ok: true };
+  console.error("[edibytes] verify-otp refused", res.status, JSON.stringify(json));
+  return { ok: false, error: String(pick(json, "error.message", "message", "detail") ?? "That code was not accepted") };
+}
+
+/** Send the approval prompt (and so a fresh code) to the same number again. */
+export async function edibytesResend(reference: string, phone: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${edibytesBase()}/api/payments/${encodeURIComponent(reference)}/charge/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (res.ok) return { ok: true };
+  return { ok: false, error: String(pick(json, "error.message", "message", "detail") ?? "Couldn't resend the code") };
+}
+
 function edibytesBase() {
   return (env("EDIBYTES_BASE_URL") ?? "https://api.edibytes.online").replace(/\/+$/, "");
 }
@@ -215,7 +242,7 @@ const edibytes: GatewayAdapter = {
         if (charge.status >= 500) return { ok: false, error: "The payment service is busy. Please try again in a minute." };
         return { ok: false, error: reason || "Could not send the payment prompt. Check the number and try again." };
       }
-      return { ok: true, awaitingPrompt: true, metadata: id ? { edibytesId: id } : undefined };
+      return { ok: true, awaitingPrompt: true, metadata: { edibytesId: id ?? null, edibytesRef: payRef, phone: localGhanaNumber(phone) } };
     } catch (err) {
       console.error("[edibytes] start", err);
       return { ok: false, error: "Could not start checkout" };

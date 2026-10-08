@@ -437,8 +437,34 @@ export function DepositPage() {
 /** Waits on a mobile-money approval, checking every few seconds for up to three minutes. */
 function PromptWait({ reference, amount, phone, currency, onDone }: { reference: string; amount: number; phone: string; currency: string; otp?: boolean; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number, bonus?: number) => void }) {
   const [seconds, setSeconds] = useState(0)
+  const { player } = useShell()
+  const [code, setCode] = useState('')
+  const [codeBusy, setCodeBusy] = useState(false)
+  const [codeNote, setCodeNote] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
   const done = useRef(onDone)
   done.current = onDone
+
+  const sendCode = async (action: 'verify' | 'resend') => {
+    setCodeNote(null)
+    setCodeBusy(true)
+    try {
+      const res = await fetch('/api/deposits/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference, userId: player?.id, code, action }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) return setCodeNote({ text: json.error ?? 'Something went wrong. Please try again.', tone: 'error' })
+      setCodeNote(action === 'resend'
+        ? { text: 'A new prompt and code are on the way.', tone: 'ok' }
+        : { text: 'Code accepted. Finishing your payment…', tone: 'ok' })
+      if (action === 'verify') setCode('')
+    } catch {
+      setCodeNote({ text: 'Something went wrong. Please try again.', tone: 'error' })
+    } finally {
+      setCodeBusy(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -473,6 +499,25 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
       <div className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-[#5f6f69] shadow-sm">
         <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff7a1a]" /> Waiting for approval · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
       </div>
+      <form
+        className="mx-auto mt-6 max-w-[340px] space-y-2 rounded-2xl border border-[#dde7e2] bg-white p-4 text-left"
+        onSubmit={(event) => { event.preventDefault(); sendCode('verify') }}
+      >
+        <label htmlFor="momo-code" className="block text-sm font-semibold text-[#0f1f1a]">Got a verification code?</label>
+        <p className="text-xs text-[#5f6f69]">Some networks text a code. If you received one, enter it here.</p>
+        <input
+          id="momo-code"
+          value={code}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="1234"
+          className="h-12 w-full rounded-xl border border-[#dde7e2] px-4 text-center text-lg tracking-[0.3em] outline-none focus:border-[#0b6e4f]"
+        />
+        {codeNote && <p className={`text-sm ${codeNote.tone === 'ok' ? 'text-[#0b7a2e]' : 'text-[#e40014]'}`}>{codeNote.text}</p>}
+        <button disabled={codeBusy || code.length < 4} className="h-11 w-full rounded-xl bg-[#ff7a1a] text-sm font-bold text-[#0f1f1a] disabled:opacity-50">{codeBusy ? 'Please wait…' : 'Verify & pay'}</button>
+        <button type="button" onClick={() => sendCode('resend')} disabled={codeBusy} className="w-full text-center text-sm font-semibold text-[#0b6e4f] disabled:opacity-50">Resend code</button>
+      </form>
       <p className="mt-6 text-[13px] text-[#5f6f69]">No prompt? MTN users can dial *170#, then choose 6 and 3 to approve pending payments.</p>
       <button onClick={() => onDone('timeout')} className="mt-6 text-sm font-semibold text-[#0b6e4f]">Back to deposit</button>
     </div>
