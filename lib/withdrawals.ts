@@ -50,7 +50,7 @@ export function checkWithdrawalGate(
         label: `Verification ${user.qualifying_deposits}/${country.withdrawQualifyCount}: make ${country.withdrawQualifyCount} deposits of ${formatMoney(
           country.withdrawQualifyAmount,
           country.currency,
-        )} or more to unlock withdrawals`,
+        )} to unlock withdrawals`,
       }
     : {
         have: Number(user.total_deposited),
@@ -92,7 +92,7 @@ export function checkWithdrawalGate(
         message: `${remaining} more deposit${remaining === 1 ? "" : "s"} of ${formatMoney(
           country.withdrawQualifyAmount,
           country.currency,
-        )} or more needed to unlock withdrawals`,
+        )} to unlock withdrawals`,
         progress,
       };
     }
