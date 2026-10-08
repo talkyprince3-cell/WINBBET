@@ -316,6 +316,7 @@ export function DepositPage() {
   const phone = switching && otherPhone.replace(/\D/g, '').length >= 9 ? otherPhone : player.phone
   const network = networkFor(phone, country?.code ?? player.country_code, country?.networks ?? [])
   const cardRail = country?.gateway === 'flutterwave_card'
+  const hostedRail = country?.gateway === 'flutterwave_hosted'
   const value = Number(amount)
   const ready = Number.isFinite(value) && value >= min && (!max || value <= max) && !busy
   const chips = CHIPS[currency] ?? DEFAULT_CHIPS
@@ -377,14 +378,24 @@ export function DepositPage() {
     `Minimum deposit is ${formatMoney(min, currency)}.`,
     ...(max ? [`Maximum per transaction is ${formatMoney(max, currency)}.`] : []),
     'Deposit is free, no transaction fees.',
-    ...(cardRail ? ['You will enter your card on the next screen.'] : ['A payment prompt is sent to the number above. Approve it to finish.']),
+    ...(cardRail
+      ? ['You will enter your card on the next screen.']
+      : hostedRail
+        ? ['You will complete your payment on a secure payment page.']
+        : ['A payment prompt is sent to the number above. Approve it to finish.']),
   ]
+
+  const tab = cardRail
+    ? { key: 'card', label: 'Card' }
+    : hostedRail
+      ? { key: 'online', label: 'Pay Online' }
+      : { key: 'momo', label: 'Mobile Money' }
 
   return (
     <DarkPage title="Deposit" help="/help">
-      <Tabs items={[cardRail ? { key: 'card', label: 'Card' } : { key: 'momo', label: 'Mobile Money' }]} value={cardRail ? 'card' : 'momo'} onChange={() => {}} />
+      <Tabs items={[tab]} value={tab.key} onChange={() => {}} />
       <div className="space-y-4 px-4 py-5 sm:px-6">
-        {!cardRail && (
+        {!cardRail && !hostedRail && (
           <>
             <PhoneRow phone={phone} />
             <NetworkRow network={network} switching={switching} onSwitch={() => setSwitching((open) => !open)} />

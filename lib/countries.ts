@@ -9,6 +9,7 @@ export type Gateway =
   | "flutterwave_card"
   | "flutterwave_momo"
   | "flutterwave_v3_momo"
+  | "flutterwave_hosted"
   | "edibytes"
   | "manual";
 
@@ -69,8 +70,11 @@ const BASE: Record<string, CountryConfig> = {
     currencySymbol: "₦",
     dialCode: "234",
     phoneDigits: 10,
-    // Cards are taken on our own checkout page rather than a hosted one.
-    gateway: "flutterwave_card",
+    // Flutterwave's hosted page: card, bank transfer and USSD all work there
+    // without the direct-charge enablement our own /checkout page needs. The
+    // operator can switch to flutterwave_card once direct card charges are
+    // enabled on the account.
+    gateway: "flutterwave_hosted",
     payoutRail: "bank",
     kyc: [
       { kind: "bvn", label: "BVN", pattern: /^\d{11}$/, hint: "11 digits" },

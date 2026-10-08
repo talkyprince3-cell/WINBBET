@@ -46,6 +46,17 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
           { value: "manual", label: "Manual transfer" },
         ],
       },
+      {
+        key: "DEPOSIT_GATEWAY_NG",
+        label: "Nigeria deposits via",
+        secret: false,
+        hint: "Which rail takes Nigeria deposits.",
+        options: [
+          { value: "flutterwave_hosted", label: "Flutterwave hosted page (card, bank, USSD)" },
+          { value: "flutterwave_card", label: "Card on our checkout (needs direct charges enabled)" },
+          { value: "manual", label: "Manual transfer" },
+        ],
+      },
     ],
   },
   {
