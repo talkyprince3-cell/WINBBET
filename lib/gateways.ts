@@ -129,21 +129,73 @@ const flutterwaveCard: GatewayAdapter = {
   status: v4Outcome,
 };
 
+/**
+ * Ghana: Flutterwave v4 direct mobile money. Three calls — a customer, a
+ * payment method naming the network, then the charge — and the player approves
+ * the prompt on their handset without ever leaving the deposit screen.
+ */
+const flutterwaveMomo: GatewayAdapter = {
+  id: "flutterwave_momo",
+  label: "Mobile money",
+  async start({ reference, amount, currency, phone, email, name, redirectUrl }) {
+    if (!v4Configured()) return { ok: false, error: "Mobile money deposits are not available right now" };
+
+    const customer = await createCustomer({ email, name, phone, dialCode: "233", reference });
+    if (!customer.ok || !customer.data?.id) {
+      return { ok: false, error: customer.error ?? "Could not start your deposit. Please try again." };
+    }
+
+    const method = await createMobileMoneyPaymentMethod({ countryCode: "233", network: ghanaNetwork(phone), phone });
+    if (!method.ok || !method.data?.id) {
+      return { ok: false, error: method.error ?? "Could not start your deposit. Check the number and try again." };
+    }
+
+    const charge = await createCharge({
+      reference,
+      amount,
+      currency,
+      customerId: customer.data.id,
+      paymentMethodId: method.data.id,
+      redirectUrl,
+    });
+    if (!charge.ok || !charge.data) {
+      return { ok: false, error: charge.error ?? "Could not send the payment prompt. Please try again." };
+    }
+
+    const { chargeId, step } = charge.data;
+    const metadata = { charge_id: chargeId, phone };
+    if (step.kind === "failed") return { ok: false, error: "The charge was declined. Check the number and try again." };
+    // Some networks route through a page of Flutterwave's rather than a
+    // handset prompt; the charge says which with a redirect next_action.
+    if (step.kind === "redirect") return { ok: true, redirectUrl: step.url, metadata };
+    // Vodafone-style voucher flows ask for a code the network texts; the
+    // deposit screen collects it and /api/deposits/otp authorizes the charge.
+    if (step.kind === "otp") return { ok: true, awaitingPrompt: true, awaitingOtp: true, metadata };
+    return { ok: true, awaitingPrompt: true, metadata };
+  },
+  status: v4Outcome,
+};
+
 // ---------------------------------------------------------------- Edibytes
 
 /**
- * Edibytes: hosted checkout. We open a payment, send the player to Edibytes to
- * pay, and ask for the outcome by our own reference when they come back.
+ * Edibytes (AlphaPay): initialize with the player's number, which texts them a
+ * one-time code; the real charge is only dispatched when that code passes
+ * verify-otp. Nothing reaches the player's wallet before then, so the deposit
+ * screen collects the code itself and the player never leaves us.
  *
  * Every payment names a domain that must be whitelisted on the Edibytes
  * dashboard; by default it is the host this site is served from.
  *
- * Observed live: initialize answers { id, status: "pending", amount: "100.00",
- * currency, reference, checkout_url }, and verify answers { status, amount,
- * channel, paid_at }. Other field names are still tried, and anything
- * unrecognised is logged in full rather than guessed at.
+ * Per their docs: initialize with phone_number answers { status:
+ * "otp_required", checkout_url, ... } (or { status: "pending" } when the
+ * merchant has OTP switched off, meaning the prompt is already on its way),
+ * verify-otp answers { status: "pending" } and dispatches the charge, and
+ * verify answers { status, amount, channel, paid_at }. Other field names are
+ * still tried, and anything unrecognised is logged in full rather than
+ * guessed at.
  */
-/** The verification code some networks text before releasing a payment. */
+/** The code the player was texted. A correct one dispatches the real charge. */
 export async function edibytesVerifyCode(reference: string, code: string): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`${edibytesBase()}/api/payments/${encodeURIComponent(reference)}/verify-otp/`, {
     method: "POST",
@@ -157,12 +209,33 @@ export async function edibytesVerifyCode(reference: string, code: string): Promi
   return { ok: false, error: String(pick(json, "error.message", "message", "detail") ?? "That code was not accepted") };
 }
 
-/** Send the approval prompt (and so a fresh code) to the same number again. */
-export async function edibytesResend(reference: string, phone: string): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch(`${edibytesBase()}/api/payments/${encodeURIComponent(reference)}/charge/`, {
+export interface EdibytesResendOpts {
+  reference: string;
+  phone: string;
+  amount: number;
+  currency: string;
+  /** The whitelisted domain the payment was opened for. */
+  domain?: string;
+}
+
+/**
+ * A fresh code. Their documented resend path is initializing the same payment
+ * again with the same phone number, which re-texts the code.
+ */
+export async function edibytesResend({ reference, phone, amount, currency, domain }: EdibytesResendOpts): Promise<{ ok: boolean; error?: string }> {
+  const key = env("EDIBYTES_SECRET_KEY");
+  const forDomain = domain || env("EDIBYTES_DOMAIN");
+  if (!key || !forDomain) return { ok: false, error: "Start the deposit again to get a new code" };
+  const res = await fetch(`${edibytesBase()}/api/payments/initialize/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone }),
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: Math.round(amount * 100) / 100,
+      currency,
+      reference,
+      domain: forDomain,
+      phone_number: localGhanaNumber(phone),
+    }),
     cache: "no-store",
   });
   const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
@@ -208,10 +281,11 @@ const edibytes: GatewayAdapter = {
           currency,
           reference,
           domain,
+          // Their API texts this number a one-time code and holds the real
+          // charge until verify-otp passes, so the deposit screen collects
+          // the code rather than redirecting to their hosted page.
+          phone_number: localGhanaNumber(phone),
           email: email || undefined,
-          // No phone: any valid number makes their initialize endpoint answer
-          // 502 (reproduced live), while the checkout page asks for the
-          // mobile-money number itself.
           name,
           callback_url: redirectUrl,
         }),
@@ -227,22 +301,14 @@ const edibytes: GatewayAdapter = {
 
       const id = pick(json, "data.id", "id", "data.access_code", "access_code");
       const payRef = String(pick(json, "data.reference", "reference") ?? reference);
+      const status = String(pick(json, "data.status", "status") ?? "").toLowerCase();
+      const metadata = { edibytesId: id ?? null, edibytesRef: payRef, phone: localGhanaNumber(phone), domain };
 
-      // Send the approval prompt straight to the player's phone, the same call
-      // their hosted page makes on "Pay now", so the player never leaves us.
-      const charge = await fetch(`${edibytesBase()}/api/payments/${encodeURIComponent(payRef)}/charge/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: localGhanaNumber(phone) }),
-      });
-      const chargeJson = (await charge.json().catch(() => null)) as Record<string, unknown> | null;
-      if (!charge.ok) {
-        const reason = String(pick(chargeJson, "error.message", "message", "detail") ?? "");
-        console.error("[edibytes] charge refused", charge.status, reason);
-        if (charge.status >= 500) return { ok: false, error: "The payment service is busy. Please try again in a minute." };
-        return { ok: false, error: reason || "Could not send the payment prompt. Check the number and try again." };
-      }
-      return { ok: true, awaitingPrompt: true, metadata: { edibytesId: id ?? null, edibytesRef: payRef, phone: localGhanaNumber(phone) } };
+      // otp_required: the code gates the charge, so the player must type it in
+      // before anything lands on their handset. A plain pending means the
+      // merchant has OTP switched off and the approval prompt is already out.
+      if (status === "otp_required") return { ok: true, awaitingPrompt: true, awaitingOtp: true, metadata };
+      return { ok: true, awaitingPrompt: true, metadata };
     } catch (err) {
       console.error("[edibytes] start", err);
       return { ok: false, error: "Could not start checkout" };
@@ -304,6 +370,7 @@ function onAccount(adapter: GatewayAdapter, country: string): GatewayAdapter {
 
 const ADAPTERS: Record<Gateway, GatewayAdapter> = {
   flutterwave_card: onAccount(flutterwaveCard, "NG"),
+  flutterwave_momo: onAccount(flutterwaveMomo, "GH"),
   edibytes,
   manual,
 };
@@ -343,6 +410,8 @@ function hasKeys(gateway: Gateway): boolean {
   switch (gateway) {
     case "flutterwave_card":
       return withFlutterwaveAccount("NG", () => cardsConfigured());
+    case "flutterwave_momo":
+      return withFlutterwaveAccount("GH", () => v4Configured());
     case "edibytes":
       return Boolean(env("EDIBYTES_SECRET_KEY"));
     default:

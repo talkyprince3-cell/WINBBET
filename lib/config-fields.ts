@@ -26,12 +26,23 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
     fields: [{ key: "API_FOOTBALL_KEY", label: "API-Football key", secret: true }],
   },
   {
-    title: "Flutterwave · Nigeria cards",
+    title: "Flutterwave · cards and mobile money",
     fields: [
       { key: "FLUTTERWAVE_CLIENT_ID", label: "Client ID (v4)", secret: false },
       { key: "FLUTTERWAVE_CLIENT_SECRET", label: "Client secret (v4)", secret: true },
       { key: "FLUTTERWAVE_ENCRYPTION_KEY", label: "Encryption key", secret: true },
       { key: "FLUTTERWAVE_ENV", label: "Environment", secret: false, hint: "Type sandbox for testing. Anything else is live." },
+      {
+        key: "DEPOSIT_GATEWAY_GH",
+        label: "Ghana deposits via",
+        secret: false,
+        hint: "Which rail takes Ghana mobile-money deposits.",
+        options: [
+          { value: "flutterwave_momo", label: "Flutterwave mobile money" },
+          { value: "edibytes", label: "Edibytes" },
+          { value: "manual", label: "Manual transfer" },
+        ],
+      },
     ],
   },
   {

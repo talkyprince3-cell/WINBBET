@@ -434,13 +434,22 @@ export function DepositPage() {
   )
 }
 
-/** Waits on a mobile-money approval, checking every few seconds for up to three minutes. */
-function PromptWait({ reference, amount, phone, currency, onDone }: { reference: string; amount: number; phone: string; currency: string; otp?: boolean; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number, bonus?: number) => void }) {
+/**
+ * Waits on a mobile-money approval, checking every few seconds for up to three
+ * minutes. When the rail wants the texted code first (`otp`), the code is the
+ * gate: nothing reaches the player's handset until it is verified, so the
+ * screen leads with code entry and only starts the approval clock afterwards.
+ */
+function PromptWait({ reference, amount, phone, currency, otp, onDone }: { reference: string; amount: number; phone: string; currency: string; otp?: boolean; onDone: (result: 'confirmed' | 'failed' | 'timeout', balance?: number, bonus?: number) => void }) {
   const [seconds, setSeconds] = useState(0)
   const { player } = useShell()
   const [code, setCode] = useState('')
   const [codeBusy, setCodeBusy] = useState(false)
   const [codeNote, setCodeNote] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const [needCode, setNeedCode] = useState(Boolean(otp))
+  const needCodeRef = useRef(needCode)
+  needCodeRef.current = needCode
+  const startedRef = useRef(Date.now())
   const done = useRef(onDone)
   done.current = onDone
 
@@ -455,10 +464,15 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) return setCodeNote({ text: json.error ?? 'Something went wrong. Please try again.', tone: 'error' })
-      setCodeNote(action === 'resend'
-        ? { text: 'A new prompt and code are on the way.', tone: 'ok' }
-        : { text: 'Code accepted. Finishing your payment…', tone: 'ok' })
-      if (action === 'verify') setCode('')
+      if (action === 'resend') {
+        setCodeNote({ text: 'A new code is on the way.', tone: 'ok' })
+      } else {
+        setCodeNote({ text: 'Code accepted. The payment prompt is on its way to your phone.', tone: 'ok' })
+        setCode('')
+        setNeedCode(false)
+        startedRef.current = Date.now()
+        setSeconds(0)
+      }
     } catch {
       setCodeNote({ text: 'Something went wrong. Please try again.', tone: 'error' })
     } finally {
@@ -468,15 +482,16 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
 
   useEffect(() => {
     let alive = true
-    const started = Date.now()
-    const tick = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000)
+    const tick = setInterval(() => setSeconds(Math.floor((Date.now() - startedRef.current) / 1000)), 1000)
     const check = async () => {
       if (!alive) return
       const json = await fetch(`/api/deposits/status?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' }).then((res) => res.json()).catch(() => null)
       if (!alive) return
       if (json?.status === 'confirmed') return done.current('confirmed', json.balance, Number(json.bonusPaid ?? 0))
       if (json?.status === 'failed') return done.current('failed')
-      if (Date.now() - started > 180_000) return done.current('timeout')
+      // Give up only once the prompt is actually out; while the player is
+      // still typing the code there is nothing to time out on.
+      if (!needCodeRef.current && Date.now() - startedRef.current > 180_000) return done.current('timeout')
       setTimeout(check, 4000)
     }
     const first = setTimeout(check, 4000)
@@ -492,19 +507,24 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f5ee]">
         <Smartphone size={30} className="text-[#0b6e4f]" />
       </div>
-      <h2 className="mt-4 text-xl font-bold">Approve on your phone</h2>
+      <h2 className="mt-4 text-xl font-bold">{needCode ? 'Confirm your number' : 'Approve on your phone'}</h2>
       <p className="mt-2 text-[15px] text-[#34463f]">
-        A payment prompt for <b>{formatMoney(amount, currency)}</b> has been sent to <b>+{countryPrefix(phone)} {maskPhoneTail(phone)}</b>. Enter your mobile money PIN to approve it.
+        {needCode ? (
+          <>We&apos;ve texted a verification code to <b>+{countryPrefix(phone)} {maskPhoneTail(phone)}</b>. Enter it below to send the <b>{formatMoney(amount, currency)}</b> payment prompt to your phone.</>
+        ) : (
+          <>A payment prompt for <b>{formatMoney(amount, currency)}</b> has been sent to <b>+{countryPrefix(phone)} {maskPhoneTail(phone)}</b>. Enter your mobile money PIN to approve it.</>
+        )}
       </p>
       <div className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-[#5f6f69] shadow-sm">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff7a1a]" /> Waiting for approval · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff7a1a]" />
+        {needCode ? 'Waiting for your code' : <>Waiting for approval · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</>}
       </div>
       <form
         className="mx-auto mt-6 max-w-[340px] space-y-2 rounded-2xl border border-[#dde7e2] bg-white p-4 text-left"
         onSubmit={(event) => { event.preventDefault(); sendCode('verify') }}
       >
-        <label htmlFor="momo-code" className="block text-sm font-semibold text-[#0f1f1a]">Got a verification code?</label>
-        <p className="text-xs text-[#5f6f69]">Some networks text a code. If you received one, enter it here.</p>
+        <label htmlFor="momo-code" className="block text-sm font-semibold text-[#0f1f1a]">{needCode ? 'Verification code' : 'Got a verification code?'}</label>
+        <p className="text-xs text-[#5f6f69]">{needCode ? 'The SMS can take up to a minute to arrive.' : 'Some networks text a code. If you received one, enter it here.'}</p>
         <input
           id="momo-code"
           value={code}
@@ -518,7 +538,7 @@ function PromptWait({ reference, amount, phone, currency, onDone }: { reference:
         <button disabled={codeBusy || code.length < 4} className="h-11 w-full rounded-xl bg-[#ff7a1a] text-sm font-bold text-[#0f1f1a] disabled:opacity-50">{codeBusy ? 'Please wait…' : 'Verify & pay'}</button>
         <button type="button" onClick={() => sendCode('resend')} disabled={codeBusy} className="w-full text-center text-sm font-semibold text-[#0b6e4f] disabled:opacity-50">Resend code</button>
       </form>
-      <p className="mt-6 text-[13px] text-[#5f6f69]">No prompt? MTN users can dial *170#, then choose 6 and 3 to approve pending payments.</p>
+      {!needCode && <p className="mt-6 text-[13px] text-[#5f6f69]">No prompt? MTN users can dial *170#, then choose 6 and 3 to approve pending payments.</p>}
       <button onClick={() => onDone('timeout')} className="mt-6 text-sm font-semibold text-[#0b6e4f]">Back to deposit</button>
     </div>
   )
