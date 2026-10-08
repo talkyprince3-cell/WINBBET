@@ -6,13 +6,8 @@
 
 export type PayoutRail = "mobile" | "bank";
 export type Gateway =
-  | "flutterwave_momo"
   | "flutterwave_card"
-  | "korapay"
-  | "moolre"
-  | "paystack"
   | "edibytes"
-  | "flutterwave_v3_momo"
   | "manual";
 
 export type KycKind = "bvn" | "nin" | "national_id";
@@ -48,8 +43,8 @@ const BASE: Record<string, CountryConfig> = {
     currencySymbol: "GH₵",
     dialCode: "233",
     phoneDigits: 9,
-    // Flutterwave v3: the account is not enabled for mobile money on v4.
-    gateway: "flutterwave_v3_momo",
+    // Ghana mobile money is taken through Edibytes.
+    gateway: "edibytes",
     payoutRail: "mobile",
     // Ghana collects no KYC value at sign-up; identity is carried by the
     // mobile-money number, which is already name-verified by the network.

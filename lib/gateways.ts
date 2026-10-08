@@ -112,61 +112,6 @@ async function v4Outcome(reference: string, meta?: Record<string, unknown>): Pro
 }
 
 /**
- * Ghana: a mobile-money charge the player approves on the handset.
- *
- * Three calls make one charge on v4 — the customer, the payment method, then
- * the charge itself — and the player sees none of that. They see the prompt.
- */
-const flutterwaveMomo: GatewayAdapter = {
-  id: "flutterwave_momo",
-  label: "Mobile money",
-  async start({ reference, amount, currency, phone, email, name }) {
-    if (!v4Configured()) return { ok: false, error: "Mobile money is not available right now" };
-
-    const customer = await createCustomer({
-      email: email || `${phone}@3btafric.com`,
-      name,
-      phone,
-      dialCode: "233",
-      reference,
-    });
-    if (!customer.ok || !customer.data?.id) {
-      return { ok: false, error: customer.error ?? "Could not start the charge" };
-    }
-
-    const method = await createMobileMoneyPaymentMethod({
-      countryCode: "233",
-      network: ghanaNetwork(phone),
-      phone,
-    });
-    if (!method.ok || !method.data?.id) {
-      return { ok: false, error: method.error ?? "That number was not accepted" };
-    }
-
-    const charge = await createCharge({
-      reference,
-      amount,
-      currency,
-      customerId: customer.data.id,
-      paymentMethodId: method.data.id,
-      redirectUrl: "",
-    });
-    if (!charge.ok || !charge.data) {
-      return { ok: false, error: charge.error ?? "Could not start the charge" };
-    }
-
-    const step = charge.data.step;
-    return {
-      ok: true,
-      metadata: { charge_id: charge.data.chargeId },
-      redirectUrl: step.kind === "redirect" ? step.url : undefined,
-      awaitingPrompt: step.kind !== "redirect",
-    };
-  },
-  status: v4Outcome,
-};
-
-/**
  * Nigeria: our own checkout page, on our own domain.
  *
  * There is nothing to call at the start of this one. The player is sent to
@@ -183,296 +128,6 @@ const flutterwaveCard: GatewayAdapter = {
   },
   status: v4Outcome,
 };
-
-// ---------------------------------------------------------------- Korapay
-
-const korapay: GatewayAdapter = {
-  id: "korapay",
-  label: "Korapay",
-  async start({ reference, amount, currency, email, name, redirectUrl }) {
-    const key = env("KORAPAY_SECRET_KEY");
-    if (!key) return { ok: false, error: "Korapay is not available right now" };
-    try {
-      const res = await fetch("https://api.korapay.com/merchant/api/v1/charges/initialize", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reference,
-          amount,
-          currency,
-          redirect_url: redirectUrl,
-          customer: { email: email || "player@3btafric.com", name },
-          notification_url: `${redirectUrl.split("/account")[0]}/api/deposits/korapay/webhook`,
-        }),
-      });
-      const json = await res.json();
-      if (!json?.status) return { ok: false, error: json?.message ?? "Could not start checkout" };
-      return { ok: true, redirectUrl: json.data?.checkout_url };
-    } catch (err) {
-      console.error("[korapay] start", err);
-      return { ok: false, error: "Could not start checkout" };
-    }
-  },
-  async status(reference) {
-    const key = env("KORAPAY_SECRET_KEY");
-    if (!key) return { status: "pending" };
-    try {
-      const res = await fetch(`https://api.korapay.com/merchant/api/v1/charges/${encodeURIComponent(reference)}`, {
-        headers: { Authorization: `Bearer ${key}` },
-      });
-      const json = await res.json();
-      const s = String(json?.data?.status ?? "").toLowerCase();
-      const status: ChargeStatus =
-        s === "success" ? "confirmed" : s === "failed" || s === "expired" ? "failed" : "pending";
-      const paid = Number(json?.data?.amount);
-      return {
-        status,
-        paidAmount: Number.isFinite(paid) && paid > 0 ? paid : undefined,
-        paidCurrency: json?.data?.currency,
-      };
-    } catch {
-      return { status: "pending" };
-    }
-  },
-};
-
-// ----------------------------------------------------------------- Moolre
-
-const moolre: GatewayAdapter = {
-  id: "moolre",
-  label: "Moolre",
-  async start({ reference, amount, currency, phone }) {
-    const key = env("MOOLRE_API_KEY");
-    const user = env("MOOLRE_API_USER");
-    const account = env("MOOLRE_ACCOUNT_NUMBER");
-    if (!key || !user || !account) return { ok: false, error: "Moolre is not available right now" };
-    try {
-      const res = await fetch("https://api.moolre.com/open/transact/receive", {
-        method: "POST",
-        headers: { "X-API-USER": user, "X-API-PUBKEY": key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: 1,
-          channel: 13,
-          currency,
-          payer: phone,
-          amount,
-          accountnumber: account,
-          reference,
-          externalref: reference,
-        }),
-      });
-      const json = await res.json();
-      if (json?.status !== 1) return { ok: false, error: json?.message ?? "Could not start the charge" };
-      return { ok: true, awaitingPrompt: true };
-    } catch (err) {
-      console.error("[moolre] start", err);
-      return { ok: false, error: "Could not start the charge" };
-    }
-  },
-  async status(reference) {
-    const key = env("MOOLRE_API_KEY");
-    const user = env("MOOLRE_API_USER");
-    const account = env("MOOLRE_ACCOUNT_NUMBER");
-    if (!key || !user || !account) return { status: "pending" };
-    try {
-      const res = await fetch("https://api.moolre.com/open/transact/status", {
-        method: "POST",
-        headers: { "X-API-USER": user, "X-API-PUBKEY": key, "Content-Type": "application/json" },
-        body: JSON.stringify({ type: 1, accountnumber: account, externalref: reference }),
-      });
-      const json = await res.json();
-      const code = Number(json?.data?.txstatus ?? json?.status);
-      const status: ChargeStatus = code === 1 ? "confirmed" : code === 2 || code === 3 ? "failed" : "pending";
-      const paid = Number(json?.data?.amount);
-      return {
-        status,
-        paidAmount: Number.isFinite(paid) && paid > 0 ? paid : undefined,
-        paidCurrency: json?.data?.currency,
-      };
-    } catch {
-      return { status: "pending" };
-    }
-  },
-};
-
-// ---------------------------------------------------------------- Paystack
-
-const paystack: GatewayAdapter = {
-  id: "paystack",
-  label: "Paystack",
-  async start({ reference, amount, currency, email, phone, redirectUrl }) {
-    const key = env("PAYSTACK_SECRET_KEY");
-    if (!key) return { ok: false, error: "Paystack is not available right now" };
-    try {
-      const res = await fetch("https://api.paystack.co/transaction/initialize", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reference,
-          // Paystack takes the minor unit.
-          amount: Math.round(amount * 100),
-          currency,
-          email: email || `${phone}@3btafric.com`,
-          callback_url: redirectUrl,
-        }),
-      });
-      const json = await res.json();
-      if (!json?.status) return { ok: false, error: json?.message ?? "Could not start checkout" };
-      return { ok: true, redirectUrl: json.data?.authorization_url };
-    } catch (err) {
-      console.error("[paystack] start", err);
-      return { ok: false, error: "Could not start checkout" };
-    }
-  },
-  async status(reference) {
-    const key = env("PAYSTACK_SECRET_KEY");
-    if (!key) return { status: "pending" };
-    try {
-      const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-        headers: { Authorization: `Bearer ${key}` },
-      });
-      const json = await res.json();
-      const s = String(json?.data?.status ?? "").toLowerCase();
-      const status: ChargeStatus =
-        s === "success" ? "confirmed" : s === "failed" || s === "abandoned" ? "failed" : "pending";
-      // Paystack reports in the minor unit.
-      const paid = Number(json?.data?.amount) / 100;
-      return {
-        status,
-        paidAmount: Number.isFinite(paid) && paid > 0 ? paid : undefined,
-        paidCurrency: json?.data?.currency,
-      };
-    } catch {
-      return { status: "pending" };
-    }
-  },
-};
-
-// ------------------------------------------------------- Flutterwave v3
-
-/**
- * Flutterwave v3 Ghana mobile money, for accounts where v4 is not enabled for
- * mobile money. Same flow as the site this was taken from: charge the wallet,
- * the player approves the prompt (or types an OTP some networks send), and the
- * outcome is read back by our own reference.
- */
-const FLW3 = "https://api.flutterwave.com/v3";
-
-function localGhana(phone: string): string {
-  const digits = String(phone || "").replace(/\D/g, "");
-  const local = digits.startsWith("233") ? digits.slice(3) : digits.replace(/^0+/, "");
-  return `0${local.slice(-9)}`;
-}
-
-const flutterwaveV3Momo: GatewayAdapter = {
-  id: "flutterwave_v3_momo",
-  label: "Mobile money",
-  async start({ reference, amount, currency, phone, email, name, redirectUrl }) {
-    const key = env("FLUTTERWAVE_SECRET_KEY");
-    if (!key) return { ok: false, error: "Mobile money is not available right now" };
-    const payerEmail = email || `${phone.replace(/\D/g, "")}@goalvault.live`;
-    try {
-      const res = await fetch(`${FLW3}/charges?type=mobile_money_ghana`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tx_ref: reference,
-          amount,
-          currency,
-          email: payerEmail,
-          phone_number: localGhana(phone),
-          network: ghanaNetwork(phone),
-          fullname: name || undefined,
-        }),
-        cache: "no-store",
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        status?: string;
-        message?: string;
-        data?: { flw_ref?: string; id?: number; status?: string };
-        meta?: { authorization?: { redirect?: string; mode?: string } };
-      };
-      if (!res.ok || json.status !== "success") {
-        console.error("[flw3] charge refused", res.status, json.message);
-        // Direct charges need their own approval from Flutterwave; until then
-        // the hosted checkout (where Momo Ghana is enabled) takes the payment.
-        if (/not available|not enabled|contact support/i.test(String(json.message ?? ""))) {
-          return hostedCheckout(key, { reference, amount, currency, email: payerEmail, phone, name, redirectUrl });
-        }
-        return { ok: false, error: json.message ?? "Could not start the payment" };
-      }
-      const flwRef = json.data?.flw_ref ?? (json.data?.id != null ? String(json.data.id) : null);
-      const auth = json.meta?.authorization;
-      const metadata = { flw_ref: flwRef, flw_id: json.data?.id ?? null };
-      if (auth?.mode === "redirect" && auth.redirect) return { ok: true, redirectUrl: auth.redirect, metadata };
-      if (auth?.mode === "otp") return { ok: true, awaitingOtp: true, awaitingPrompt: true, metadata };
-      return { ok: true, awaitingPrompt: true, metadata };
-    } catch (err) {
-      console.error("[flw3] charge threw", err);
-      return { ok: false, error: "Could not start the payment" };
-    }
-  },
-  async status(reference) {
-    const key = env("FLUTTERWAVE_SECRET_KEY");
-    if (!key) return { status: "pending" };
-    try {
-      const res = await fetch(`${FLW3}/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`, {
-        headers: { Authorization: `Bearer ${key}` },
-        cache: "no-store",
-      });
-      const json = (await res.json().catch(() => ({}))) as { status?: string; data?: { status?: string; amount?: number; currency?: string } };
-      const s = String(json.data?.status ?? "").toLowerCase();
-      return {
-        status: s === "successful" ? "confirmed" : s === "failed" || s === "cancelled" ? "failed" : "pending",
-        paidAmount: Number(json.data?.amount) > 0 ? Number(json.data?.amount) : undefined,
-        paidCurrency: json.data?.currency,
-      };
-    } catch {
-      return { status: "pending" };
-    }
-  },
-};
-
-/** Flutterwave's hosted page, limited to Ghana mobile money. */
-async function hostedCheckout(
-  key: string,
-  opts: { reference: string; amount: number; currency: string; email: string; phone: string; name: string; redirectUrl: string },
-): Promise<StartResult> {
-  const res = await fetch(`${FLW3}/payments`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tx_ref: opts.reference,
-      amount: opts.amount,
-      currency: opts.currency,
-      redirect_url: opts.redirectUrl,
-      payment_options: "mobilemoneyghana",
-      customer: { email: opts.email, phonenumber: localGhana(opts.phone), name: opts.name },
-      customizations: { title: "GoalVault", description: "Deposit to your GoalVault wallet" },
-    }),
-    cache: "no-store",
-  });
-  const json = (await res.json().catch(() => ({}))) as { status?: string; message?: string; data?: { link?: string } };
-  if (!res.ok || json.status !== "success" || !json.data?.link) {
-    console.error("[flw3] hosted checkout refused", res.status, json.message);
-    return { ok: false, error: json.message ?? "Could not start the payment" };
-  }
-  return { ok: true, redirectUrl: json.data.link, metadata: { hosted: true } };
-}
-
-/** Submit the OTP a v3 mobile-money charge asked for. */
-export async function validateFlutterwaveV3Otp(flwRef: string, otp: string): Promise<{ ok: boolean; error?: string }> {
-  const key = env("FLUTTERWAVE_SECRET_KEY");
-  if (!key) return { ok: false, error: "Mobile money is not available right now" };
-  const res = await fetch(`${FLW3}/validate-charge`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "mobile_money_ghana", flw_ref: flwRef, otp }),
-    cache: "no-store",
-  });
-  const json = (await res.json().catch(() => ({}))) as { status?: string; message?: string };
-  return res.ok && json.status === "success" ? { ok: true } : { ok: false, error: json.message ?? "That code was not accepted" };
-}
 
 // ---------------------------------------------------------------- Edibytes
 
@@ -621,13 +276,8 @@ function onAccount(adapter: GatewayAdapter, country: string): GatewayAdapter {
 }
 
 const ADAPTERS: Record<Gateway, GatewayAdapter> = {
-  flutterwave_momo: onAccount(flutterwaveMomo, "GH"),
   flutterwave_card: onAccount(flutterwaveCard, "NG"),
-  korapay,
-  moolre,
-  paystack,
   edibytes,
-  flutterwave_v3_momo: flutterwaveV3Momo,
   manual,
 };
 
@@ -658,31 +308,24 @@ export function depositGateway(countryCode: string, fallback: Gateway): Gateway 
   if (chosen && chosen in ADAPTERS) return chosen as Gateway;
   // Nothing chosen: keep the country's default while it has keys, otherwise
   // use a gateway that does, rather than refusing every deposit.
-  if (hasKeys(fallback)) return fallback;
-  const ready = (["edibytes", "paystack", "korapay", "flutterwave_momo", "moolre"] as Gateway[]).find(hasKeys);
-  return ready ?? fallback;
+  return fallback;
 }
 
 /** Whether a gateway has the credentials it needs to take a payment. */
 function hasKeys(gateway: Gateway): boolean {
   switch (gateway) {
-    case "flutterwave_momo":
-      return withFlutterwaveAccount("GH", () => v4Configured());
     case "flutterwave_card":
       return withFlutterwaveAccount("NG", () => cardsConfigured());
     case "edibytes":
       return Boolean(env("EDIBYTES_SECRET_KEY"));
-    case "flutterwave_v3_momo":
-      return Boolean(env("FLUTTERWAVE_SECRET_KEY"));
-    case "paystack":
-      return Boolean(env("PAYSTACK_SECRET_KEY"));
-    case "korapay":
-      return Boolean(env("KORAPAY_SECRET_KEY"));
-    case "moolre":
-      return Boolean(env("MOOLRE_API_KEY") && env("MOOLRE_API_USER") && env("MOOLRE_ACCOUNT_NUMBER"));
     default:
       return true;
   }
+}
+
+/** True when the gateway a country uses has its keys in place. */
+export function gatewayReady(gateway: Gateway): boolean {
+  return hasKeys(gateway);
 }
 
 export function adapterFor(gateway: Gateway): GatewayAdapter {

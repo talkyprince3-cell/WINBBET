@@ -61,10 +61,7 @@ export async function POST(req: Request) {
 }
 
 function detectProvider(req: Request): string {
-  if (req.headers.get("verif-hash")) return "flutterwave";
-  if (req.headers.get("x-korapay-signature")) return "korapay";
-  if (req.headers.get("x-paystack-signature")) return "paystack";
-  return "moolre";
+  return req.headers.get("verif-hash") ? "flutterwave" : "unknown";
 }
 
 function safeCompare(a: string, b: string): boolean {
@@ -81,30 +78,8 @@ function verify(provider: string, req: Request, raw: string): boolean {
       const got = req.headers.get("verif-hash") ?? "";
       return Boolean(expected) && safeCompare(got, expected!);
     }
-    case "paystack": {
-      const key = config("PAYSTACK_SECRET_KEY");
-      if (!key) return false;
-      const expected = createHmac("sha512", key).update(raw).digest("hex");
-      return safeCompare(req.headers.get("x-paystack-signature") ?? "", expected);
-    }
-    case "korapay": {
-      const key = config("KORAPAY_SECRET_KEY");
-      if (!key) return false;
-      let payload = raw;
-      try {
-        payload = JSON.stringify(JSON.parse(raw).data);
-      } catch {
-        /* fall back to the raw body */
-      }
-      const expected = createHmac("sha256", key).update(payload).digest("hex");
-      return safeCompare(req.headers.get("x-korapay-signature") ?? "", expected);
-    }
-    default: {
-      const secret = config("MOOLRE_WEBHOOK_SECRET");
-      if (!secret) return false;
-      const expected = createHmac("sha256", secret).update(raw).digest("hex");
-      return safeCompare(req.headers.get("x-moolre-signature") ?? "", expected);
-    }
+    default:
+      return false;
   }
 }
 
@@ -118,20 +93,7 @@ function extract(provider: string, event: Record<string, unknown>): { reference?
         reference: str(data.tx_ref) ?? str(data.txRef),
         successful: String(data.status ?? "").toLowerCase() === "successful",
       };
-    case "paystack":
-      return {
-        reference: str(data.reference),
-        successful: String(event.event ?? "") === "charge.success",
-      };
-    case "korapay":
-      return {
-        reference: str(data.reference),
-        successful: String(event.event ?? "") === "charge.success",
-      };
     default:
-      return {
-        reference: str(data.externalref) ?? str(data.reference),
-        successful: Number(data.txstatus ?? data.status) === 1,
-      };
+      return { successful: false };
   }
 }

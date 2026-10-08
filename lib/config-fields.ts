@@ -22,45 +22,15 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
     ],
   },
   {
-    title: "Payment routing",
-    fields: [
-      {
-        key: "DEPOSIT_GATEWAY_GH",
-        label: "Ghana deposits go through",
-        secret: false,
-        hint: "Leave on the default unless the other gateway's keys are live and working.",
-        options: [
-          { value: "", label: "Default (Flutterwave mobile money v3)" },
-          { value: "flutterwave_momo", label: "Flutterwave mobile money (v4)" },
-          { value: "flutterwave_v3_momo", label: "Flutterwave mobile money (v3)" },
-          { value: "edibytes", label: "Edibytes checkout" },
-          { value: "paystack", label: "Paystack checkout" },
-          { value: "korapay", label: "Korapay checkout" },
-          { value: "moolre", label: "Moolre mobile money" },
-        ],
-      },
-    ],
-  },
-  {
     title: "Fixtures and odds",
     fields: [{ key: "API_FOOTBALL_KEY", label: "API-Football key", secret: true }],
   },
   {
-    title: "Flutterwave · Ghana mobile money",
-    fields: [
-      { key: "FLUTTERWAVE_CLIENT_ID_GH", label: "Client ID (Ghana)", secret: false, hint: "Leave empty to use the main account below." },
-      { key: "FLUTTERWAVE_CLIENT_SECRET_GH", label: "Client secret (Ghana)", secret: true },
-      { key: "FLUTTERWAVE_ENCRYPTION_KEY_GH", label: "Encryption key (Ghana)", secret: true },
-    ],
-  },
-  {
-    title: "Flutterwave · Nigeria cards (main account)",
+    title: "Flutterwave · Nigeria cards",
     fields: [
       { key: "FLUTTERWAVE_CLIENT_ID", label: "Client ID (v4)", secret: false },
       { key: "FLUTTERWAVE_CLIENT_SECRET", label: "Client secret (v4)", secret: true },
       { key: "FLUTTERWAVE_ENCRYPTION_KEY", label: "Encryption key", secret: true },
-      { key: "FLUTTERWAVE_WEBHOOK_HASH", label: "Webhook secret hash", secret: true },
-      { key: "FLUTTERWAVE_SECRET_KEY", label: "Secret key (v3)", secret: true, hint: "FLWSECK-… Used by \"Flutterwave mobile money (v3)\" for Ghana." },
       { key: "FLUTTERWAVE_ENV", label: "Environment", secret: false, hint: "Type sandbox for testing. Anything else is live." },
     ],
   },
@@ -69,23 +39,6 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
     fields: [
       { key: "EDIBYTES_SECRET_KEY", label: "Secret key", secret: true, hint: "sk_test_… for testing, sk_live_… once your account is approved." },
       { key: "EDIBYTES_DOMAIN", label: "Whitelisted domain", secret: false, hint: "Must match a domain under Domains on your Edibytes dashboard. Leave empty to use this site's own address." },
-    ],
-  },
-  {
-    title: "Paystack",
-    fields: [{ key: "PAYSTACK_SECRET_KEY", label: "Secret key", secret: true }],
-  },
-  {
-    title: "Korapay",
-    fields: [{ key: "KORAPAY_SECRET_KEY", label: "Secret key", secret: true }],
-  },
-  {
-    title: "Moolre",
-    fields: [
-      { key: "MOOLRE_API_USER", label: "API user", secret: false },
-      { key: "MOOLRE_API_KEY", label: "API key", secret: true },
-      { key: "MOOLRE_ACCOUNT_NUMBER", label: "Account number", secret: false },
-      { key: "MOOLRE_WEBHOOK_SECRET", label: "Webhook secret", secret: true },
     ],
   },
   {
