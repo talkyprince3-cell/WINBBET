@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { refreshConfig } from "@/lib/config";
-import { edibytesResend, edibytesVerifyCode } from "@/lib/gateways";
+import { edibytesResend, edibytesVerifyCode, validateFlutterwaveV3Otp } from "@/lib/gateways";
 import { authorizeCharge, withFlutterwaveAccount } from "@/lib/flutterwave-v4";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,19 @@ export async function POST(req: Request) {
     if (!result.ok) return NextResponse.json({ error: result.error ?? "That code was not accepted" }, { status: 400 });
     if (result.data?.step.kind === "failed") return NextResponse.json({ error: "That code was not accepted" }, { status: 400 });
     return NextResponse.json({ ok: true });
+  }
+
+  // Flutterwave v3 mobile money: the code validates the charge itself.
+  if (payment.provider === "flutterwave_v3_momo") {
+    if (body.action === "resend") {
+      return NextResponse.json({ error: "A new code can't be requested on this network. Check the first SMS, or start the deposit again." }, { status: 400 });
+    }
+    const code = String(body.code ?? "").replace(/\D/g, "");
+    if (code.length < 4) return NextResponse.json({ error: "Enter the code you were sent" }, { status: 400 });
+    const flwRef = typeof meta.flw_ref === "string" ? meta.flw_ref : "";
+    if (!flwRef) return NextResponse.json({ error: "This payment does not take a code" }, { status: 400 });
+    const result = await validateFlutterwaveV3Otp(flwRef, code);
+    return result.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   if (payment.provider !== "edibytes") return NextResponse.json({ error: "This payment does not take a code" }, { status: 400 });

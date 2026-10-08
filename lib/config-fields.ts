@@ -30,15 +30,18 @@ export const CONFIG_GROUPS: ConfigGroup[] = [
     fields: [
       { key: "FLUTTERWAVE_CLIENT_ID", label: "Client ID (v4)", secret: false },
       { key: "FLUTTERWAVE_CLIENT_SECRET", label: "Client secret (v4)", secret: true },
-      { key: "FLUTTERWAVE_ENCRYPTION_KEY", label: "Encryption key", secret: true },
+      { key: "FLUTTERWAVE_ENCRYPTION_KEY", label: "Encryption key (v4)", secret: true },
       { key: "FLUTTERWAVE_ENV", label: "Environment", secret: false, hint: "Type sandbox for testing. Anything else is live." },
+      { key: "FLUTTERWAVE_SECRET_KEY", label: "Secret key (v3)", secret: true, hint: "FLWSECK-… Used for Ghana mobile money on the v3 API." },
+      { key: "FLUTTERWAVE_WEBHOOK_HASH", label: "Webhook secret hash", secret: true, hint: "Must match the secret hash under Settings → Webhooks on the Flutterwave dashboard." },
       {
         key: "DEPOSIT_GATEWAY_GH",
         label: "Ghana deposits via",
         secret: false,
         hint: "Which rail takes Ghana mobile-money deposits.",
         options: [
-          { value: "flutterwave_momo", label: "Flutterwave mobile money" },
+          { value: "flutterwave_v3_momo", label: "Flutterwave mobile money (v3)" },
+          { value: "flutterwave_momo", label: "Flutterwave mobile money (v4)" },
           { value: "edibytes", label: "Edibytes" },
           { value: "manual", label: "Manual transfer" },
         ],
